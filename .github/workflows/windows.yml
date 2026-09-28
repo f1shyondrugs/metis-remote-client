@@ -1,0 +1,50 @@
+name: Windows Remote Client
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Confirm release tag matches app version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $version = node -p "require('./desktop/package.json').version"
+          if ("v$version" -ne "${{ github.ref_name }}") { throw "Tag does not match desktop/package.json" }
+      - name: Test client
+        run: node --test tests/computer-use-overlay.test.mjs tests/computer-use-worker.test.mjs tests/release-source.test.mjs
+      - name: Install dependencies
+        run: npm ci --prefix desktop
+      - name: Build Windows installer
+        run: npm run build:win --prefix desktop -- --publish never
+      - name: Upload CI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: metis-remote-client-windows
+          path: |
+            desktop/dist/Metis-AI-Remote-Client-Setup.exe
+            desktop/dist/latest.yml
+          if-no-files-found: error
+          retention-days: 7
+      - name: Publish public GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" "desktop/dist/Metis-AI-Remote-Client-Setup.exe" "desktop/dist/latest.yml" --title "Metis AI Remote Client ${{ github.ref_name }}" --generate-notes --verify-tag
