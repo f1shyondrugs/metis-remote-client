@@ -16,7 +16,7 @@ On a Windows PC with an interactive display, Computer Use is managed only in **M
 
 During Computer Use, a white edge glow and compact status notice appear on every monitor. The custom cursor matches the browser Computer Use cursor and follows the live Windows pointer for the entire operation. Pressing Escape cancels active input without changing the saved website permission. The overlay is hidden during observation and its Electron windows are excluded from screen capture. It disappears after 45 seconds without Computer Use activity.
 
-Computer Use uses built-in Windows APIs from the interactive client session. Its PowerShell work and screenshot processing run in a dedicated worker so the Electron interface stays responsive. It does not require the private `@oai/sky` package. The current screenshot path captures visible pixels; it does not capture a covered window or expose UI Automation element trees. The app package version is 1.3.5.
+Computer Use uses built-in Windows APIs from the interactive client session. Its PowerShell work and screenshot processing run in a dedicated worker so the Electron interface stays responsive. It does not require the private `@oai/sky` package. The current screenshot path captures visible pixels; it does not capture a covered window or expose UI Automation element trees. The app package version is 1.3.6.
 
 ## Build
 

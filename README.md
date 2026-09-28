@@ -20,6 +20,6 @@ npm ci --prefix desktop
 npm run build:win --prefix desktop -- --publish never
 ```
 
-The build writes `desktop/dist/Metis-AI-Remote-Client-Setup.exe` and `desktop/dist/latest.yml`. Push a tag matching `desktop/package.json`, such as `v1.3.5`, to build on GitHub Actions and publish both files as public release assets. Builds are currently unsigned and may prompt Windows SmartScreen.
+The build writes `desktop/dist/Metis-AI-Remote-Client-Setup.exe` and `desktop/dist/latest.yml`. Push a tag matching `desktop/package.json`, such as `v1.3.6`, to build on GitHub Actions and publish both files as public release assets. Builds are currently unsigned and may prompt Windows SmartScreen.
 
 The desktop app packages `client.mjs`, `computer-use.mjs`, and `computer-use-worker.mjs` from this repository. The Metis server's legacy headless client is maintained separately in the Metis repository.
