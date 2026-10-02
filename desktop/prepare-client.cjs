@@ -8,10 +8,9 @@ for (const file of ["client.mjs", "computer-use.mjs", "computer-use-worker.mjs",
   fs.copyFileSync(path.join(__dirname, "..", file), path.join(__dirname, file));
 }
 if (process.platform === "darwin") {
-  const compiled = spawnSync("xcrun", ["swiftc", "-O", path.join(__dirname, "metis-desktop-helper.swift"), "-o", path.join(__dirname, "metis-desktop-helper")], { encoding: "utf8" });
+  const compiled = spawnSync("xcrun", ["swiftc", "-O", "-emit-library", "-module-name", "MetisDesktop",
+    path.join(__dirname, "metis-desktop-helper.swift"), "-o", path.join(__dirname, "libmetisdesktop.dylib")], { encoding: "utf8" });
   if (compiled.status !== 0) {
-    throw new Error(compiled.stderr || compiled.stdout || "macOS desktop helper failed to compile");
+    throw new Error(compiled.stderr || compiled.stdout || "macOS desktop library failed to compile");
   }
-} else {
-  fs.writeFileSync(path.join(__dirname, "metis-desktop-helper"), "");
 }

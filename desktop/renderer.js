@@ -149,7 +149,7 @@ async function refreshDesktopPermissions(prompt = false) {
     const copy = desktopPermissionCopy(status);
     if (prompt && !status.available) {
       copy.title = "Enable these in System Settings";
-      copy.detail = "System Settings opened. Turn on Screen Recording and Accessibility for Metis AI Remote Client, then restart this app.";
+      copy.detail = "System Settings opened. Turn on Screen Recording and Accessibility for Metis AI Remote Client only, then restart this app.";
     }
     if (banner) {
       banner.hidden = !copy.blocked;

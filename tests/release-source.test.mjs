@@ -16,3 +16,11 @@ test("packaged client updates from the public remote-client repository without p
   assert.equal(main.includes("autoUpdater.requestHeaders"), false);
   assert.equal(main.includes("/api/remote-clients/windows-updates"), false);
 });
+
+test("macOS computer use loads an in-process library instead of a helper process", () => {
+  const unix = readFileSync(new URL("../computer-use-unix.mjs", import.meta.url), "utf8");
+  assert.match(unix, /libmetisdesktop\.dylib/);
+  assert.match(unix, /koffi\.load/);
+  assert.equal(unix.includes("metis-desktop-helper\""), false);
+  assert.match(String(pkg.dependencies.koffi), /\^2\./);
+});

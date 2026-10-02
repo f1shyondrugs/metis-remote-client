@@ -1,6 +1,6 @@
 {
   "name": "metis-ai-remote-client",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "private": true,
   "description": "Metis AI Remote Client Hub",
   "main": "main.cjs",
@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "electron-updater": "^6.6.2",
+    "koffi": "^2.16.3",
     "ws": "^8.21.2"
   },
   "devDependencies": {
@@ -30,7 +31,8 @@
       "computer-use-worker.mjs",
       "computer-use.mjs",
       "computer-use-unix.mjs",
-      "metis-desktop-helper"
+      "libmetisdesktop.dylib",
+      "**/node_modules/koffi/**"
     ],
     "files": [
       "main.cjs",
@@ -43,7 +45,7 @@
       "computer-use-worker.mjs",
       "computer-use-unix.mjs",
       "computer-use-overlay.cjs",
-      "metis-desktop-helper",
+      "libmetisdesktop.dylib",
       "assets/icon.ico",
       "assets/icon.png",
       "node_modules/**/*",
@@ -76,7 +78,14 @@
       "artifactName": "Metis-AI-Remote-Client-Setup.exe"
     },
     "mac": {
-      "target": [{ "target": "dmg", "arch": ["arm64"] }],
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
       "icon": "assets/icon.png",
       "category": "public.app-category.utilities",
       "hardenedRuntime": false,
@@ -85,7 +94,14 @@
       "artifactName": "Metis-AI-Remote-Client-${arch}.dmg"
     },
     "linux": {
-      "target": [{ "target": "AppImage", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "assets/icon.png",
       "category": "Utility",
       "artifactName": "Metis-AI-Remote-Client-x86_64.AppImage"

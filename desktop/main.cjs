@@ -159,7 +159,7 @@ async function warnIfDesktopPermissionsMissing() {
     });
     if (process.platform === "darwin" && response === 0) await desktopPermissionStatus(true);
   } catch {
-    // Older installs may not ship the unix helper next to the app.
+    // Older installs may not ship the in-process macOS desktop library.
   }
 }
 

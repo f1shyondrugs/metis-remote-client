@@ -4,10 +4,6 @@ import CoreGraphics
 
 enum DesktopError: Error { case message(String) }
 func fail(_ message: String) throws -> Never { throw DesktopError.message(message) }
-func output(_ value: [String: Any]) throws {
-    let data = try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys])
-    print(String(data: data, encoding: .utf8)!)
-}
 func windows() -> [[String: Any]] {
     let items = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
     return items.filter { ($0[kCGWindowLayer as String] as? Int) == 0 && ($0[kCGWindowAlpha as String] as? Double ?? 1) > 0 }
@@ -23,20 +19,12 @@ func geometry(_ item: [String: Any]) -> [String: Any] {
             "title": item[kCGWindowName as String] as? String ?? item[kCGWindowOwnerName as String] as? String ?? "",
             "x": Int(r.minX), "y": Int(r.minY), "width": Int(r.width), "height": Int(r.height)]
 }
-func run() throws {
-    guard CommandLine.arguments.count == 2, let data = Data(base64Encoded: CommandLine.arguments[1]),
-          let p = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-          let operation = p["operation"] as? String else { try fail("Invalid desktop request") }
+func handle(_ p: [String: Any]) throws -> [String: Any] {
+    guard let operation = p["operation"] as? String else { try fail("Invalid desktop request") }
     if operation == "request_permissions" {
         let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(opts)
         _ = CGRequestScreenCaptureAccess()
-        for value in [
-            "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
-            "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
-        ] {
-            if let url = URL(string: value) { NSWorkspace.shared.open(url) }
-        }
     }
     let accessibility = AXIsProcessTrusted(), capture = CGPreflightScreenCaptureAccess()
     let session = CGSessionCopyCurrentDictionary() as? [String: Any]
@@ -45,14 +33,13 @@ func run() throws {
     let reason = locked ? "Desktop is locked or unavailable" :
         !accessibility || !capture ? "Enable Screen Recording and Accessibility for Metis AI Remote Client in System Settings, then restart the app." : ""
     if operation == "status" || operation == "request_permissions" {
-        try output(["available": available, "accessibility": accessibility, "screenRecording": capture, "reason": reason])
-        return
+        return ["available": available, "accessibility": accessibility, "screenRecording": capture, "reason": reason, "backend": "app"]
     }
     guard available else { try fail(reason.isEmpty ? "No interactive macOS windows are available" : reason) }
     if operation == "list_windows" {
-        try output(["windows": windows().map { item -> [String: Any] in
+        return ["windows": windows().map { item -> [String: Any] in
             var g = geometry(item); g["id"] = g.removeValue(forKey: "windowId"); return g
-        }]); return
+        }]
     }
     guard let idString = p["windowId"] as? String, let id = UInt32(idString),
           var item = windows().first(where: { ($0[kCGWindowNumber as String] as? UInt32) == id }),
@@ -85,7 +72,7 @@ func run() throws {
     item = updated
     let r = rect(item)
     guard r.width > 0 && r.height > 0 && r.width <= 8000 && r.height <= 8000 else { try fail("Invalid window geometry") }
-    if operation == "observe" { try output(geometry(item)); return }
+    if operation == "observe" { return geometry(item) }
     if let expected = p["expectedGeometry"] as? [String: Any] {
         let current = geometry(item)
         for key in ["x", "y", "width", "height"] {
@@ -127,7 +114,6 @@ func run() throws {
         event.post(tap: .cghidEventTap)
     } else if operation == "type" {
         let text = Array((p["text"] as? String ?? "").utf16)
-        // Small chunks avoid truncation in applications with limited event buffers.
         for start in stride(from: 0, to: text.count, by: 20) {
             let chunk = Array(text[start..<min(start+20, text.count)])
             for down in [true, false] {
@@ -160,11 +146,29 @@ func run() throws {
             }
         }
     } else { try fail("Unsupported computer use operation") }
-    try output(["ok": true, "windowId": idString])
+    return ["ok": true, "windowId": idString]
 }
-do { try run() } catch {
-    let message: String
-    if case DesktopError.message(let detail) = error { message = detail } else { message = String(describing: error) }
-    FileHandle.standardError.write(Data((message + "\n").utf8))
-    exit(1)
+
+@_cdecl("metis_desktop_run")
+public func metis_desktop_run(_ jsonC: UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>? {
+    func encoded(_ value: [String: Any]) -> UnsafeMutablePointer<CChar>? {
+        guard let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]),
+              let text = String(data: data, encoding: .utf8) else { return strdup("{\"error\":\"Desktop request failed\"}") }
+        return strdup(text)
+    }
+    guard let jsonC, let data = String(cString: jsonC).data(using: .utf8),
+          let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        return encoded(["error": "Invalid desktop request"])
+    }
+    do { return encoded(try handle(parsed)) }
+    catch {
+        let message: String
+        if case DesktopError.message(let detail) = error { message = detail } else { message = String(describing: error) }
+        return encoded(["error": message])
+    }
+}
+
+@_cdecl("metis_desktop_free")
+public func metis_desktop_free(_ ptr: UnsafeMutablePointer<CChar>?) {
+    free(ptr)
 }

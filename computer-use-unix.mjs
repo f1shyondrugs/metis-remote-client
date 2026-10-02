@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs/promises";
@@ -5,8 +6,32 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+const require = createRequire(import.meta.url);
 const exec = promisify(execFile);
-const helper = process.env.METIS_DESKTOP_HELPER || fileURLToPath(new URL("./metis-desktop-helper", import.meta.url));
+const darwinLibPath = process.env.METIS_DESKTOP_LIB || fileURLToPath(new URL("./libmetisdesktop.dylib", import.meta.url));
+let darwinLib;
+
+function runDarwinDesktop(payload) {
+  if (!darwinLib) {
+    const koffi = require("koffi");
+    const lib = koffi.load(darwinLibPath);
+    darwinLib = {
+      koffi,
+      run: lib.func("metis_desktop_run", "void *", ["str"]),
+      free: lib.func("metis_desktop_free", "void", ["void *"]),
+    };
+  }
+  const ptr = darwinLib.run(JSON.stringify(payload));
+  if (!ptr) throw new Error("Desktop control failed");
+  try {
+    const text = darwinLib.koffi.decode(ptr, "char *");
+    const result = JSON.parse(text);
+    if (result && typeof result.error === "string") throw new Error(result.error);
+    return result;
+  } finally {
+    darwinLib.free(ptr);
+  }
+}
 const options = { timeout: 30_000, maxBuffer: 32 * 1024 * 1024 };
 const keys = { ctrl: "ctrl", control: "ctrl", shift: "shift", alt: "alt", meta: "super", super: "super",
   enter: "Return", return: "Return", esc: "Escape", escape: "Escape", tab: "Tab", backspace: "BackSpace",
@@ -19,7 +44,7 @@ export async function unixComputerUse(payload, { signal, platform = process.plat
     return result.stdout.trim();
   };
   if (platform === "darwin") {
-    const result = JSON.parse(await call(helper, [Buffer.from(JSON.stringify(payload)).toString("base64")]));
+    const result = runDarwinDesktop(payload);
     if (payload.operation !== "observe") return result;
     const temporary = await fs.mkdtemp(path.join(os.tmpdir(), "metis-observe-"));
     try {

@@ -34,4 +34,4 @@ npm run build:mac --prefix desktop -- --publish never
 npm run build:linux --prefix desktop -- --publish never
 ```
 
-The desktop app packages `client.mjs`, `computer-use.mjs`, `computer-use-unix.mjs`, and `computer-use-worker.mjs` from this repository. The Metis server's headless terminal installer is maintained separately in the Metis repository.
+The desktop app packages `client.mjs`, `computer-use.mjs`, `computer-use-unix.mjs`, and `computer-use-worker.mjs` from this repository. On macOS, Computer Use runs inside the app process so Screen Recording and Accessibility apply to Metis AI Remote Client only. The Metis server's headless terminal installer is maintained separately in the Metis repository.
