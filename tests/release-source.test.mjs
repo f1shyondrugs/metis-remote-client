@@ -29,4 +29,9 @@ test("macOS computer use loads an in-process library instead of a helper process
   assert.match(client, /platform === "darwin"/);
   assert.match(client, /computer-use\.mjs/);
   assert.match(String(pkg.dependencies.koffi), /\^2\./);
+  const helper = readFileSync(new URL("../metis-desktop-helper.swift", import.meta.url), "utf8");
+  const computerUse = readFileSync(new URL("../computer-use.mjs", import.meta.url), "utf8");
+  assert.match(helper, /CGDisplayBounds/);
+  assert.match(helper, /windowX/);
+  assert.match(computerUse, /windowX/);
 });

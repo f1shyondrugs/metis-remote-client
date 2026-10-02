@@ -19,6 +19,15 @@ func geometry(_ item: [String: Any]) -> [String: Any] {
             "title": item[kCGWindowName as String] as? String ?? item[kCGWindowOwnerName as String] as? String ?? "",
             "x": Int(r.minX), "y": Int(r.minY), "width": Int(r.width), "height": Int(r.height)]
 }
+func displayBounds(containing rect: CGRect) -> CGRect {
+    let mid = CGPoint(x: rect.midX, y: rect.midY)
+    for screen in NSScreen.screens {
+        guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else { continue }
+        let bounds = CGDisplayBounds(CGDirectDisplayID(number.uint32Value))
+        if bounds.contains(mid) { return bounds }
+    }
+    return CGDisplayBounds(CGMainDisplayID())
+}
 func handle(_ p: [String: Any]) throws -> [String: Any] {
     guard let operation = p["operation"] as? String else { try fail("Invalid desktop request") }
     if operation == "request_permissions" {
@@ -72,7 +81,15 @@ func handle(_ p: [String: Any]) throws -> [String: Any] {
     item = updated
     let r = rect(item)
     guard r.width > 0 && r.height > 0 && r.width <= 8000 && r.height <= 8000 else { try fail("Invalid window geometry") }
-    if operation == "observe" { return geometry(item) }
+    if operation == "observe" {
+        let screen = displayBounds(containing: r)
+        var g = geometry(item)
+        g["windowX"] = g["x"]; g["windowY"] = g["y"]
+        g["windowWidth"] = g["width"]; g["windowHeight"] = g["height"]
+        g["x"] = Int(screen.minX); g["y"] = Int(screen.minY)
+        g["width"] = Int(screen.width); g["height"] = Int(screen.height)
+        return g
+    }
     if let expected = p["expectedGeometry"] as? [String: Any] {
         let current = geometry(item)
         for key in ["x", "y", "width", "height"] {
@@ -80,9 +97,10 @@ func handle(_ p: [String: Any]) throws -> [String: Any] {
         }
     }
     func point(_ xKey: String, _ yKey: String) throws -> CGPoint {
+        let screen = displayBounds(containing: r)
         guard let x = p[xKey] as? Int, let y = p[yKey] as? Int,
-              x >= 0 && y >= 0 && x < Int(r.width) && y < Int(r.height) else { try fail("Coordinates are outside the target window") }
-        return CGPoint(x: r.minX + CGFloat(x), y: r.minY + CGFloat(y))
+              x >= 0 && y >= 0 && x < Int(screen.width) && y < Int(screen.height) else { try fail("Coordinates are outside the target window") }
+        return CGPoint(x: screen.minX + CGFloat(x), y: screen.minY + CGFloat(y))
     }
     func mouse(_ type: CGEventType, _ at: CGPoint, _ button: CGMouseButton = .left, _ count: Int = 1) throws {
         guard let event = CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: at, mouseButton: button) else { try fail("Cannot create mouse input") }

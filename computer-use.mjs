@@ -256,8 +256,9 @@ export async function computerUse(params = {}, { signal } = {}) {
     const observationId = randomUUID();
     observations.clear();
     observations.set(observationId, { windowId: payload.windowId, at: Date.now(),
-      geometry: process.platform !== "win32" ? { x: result.x, y: result.y,
-        width: result.coordinateWidth ?? result.width, height: result.coordinateHeight ?? result.height } : undefined,
+      geometry: process.platform !== "win32" ? { x: result.windowX ?? result.x, y: result.windowY ?? result.y,
+        width: result.windowWidth ?? result.coordinateWidth ?? result.width,
+        height: result.windowHeight ?? result.coordinateHeight ?? result.height } : undefined,
       scale: { x: (result.coordinateWidth ?? result.width) / result.width,
         y: (result.coordinateHeight ?? result.height) / result.height } });
     return { ...result, observationId };
