@@ -47,6 +47,16 @@
       <div id="hub-error" class="error-banner" role="alert" hidden></div>
       <div class="device-summary status-summary"><span id="device-status" class="device-state">Offline</span><span id="device-meta">Windows device</span><span id="device-seen"></span></div>
       <div class="device-summary"><strong>Computer Use</strong><span class="subtle">Managed in Metis AI → Settings → Devices.</span></div>
+      <div id="desktop-permissions" class="device-summary permissions-card" hidden>
+        <div>
+          <strong>Desktop permissions</strong>
+          <p id="desktop-permissions-summary" class="subtle">Checking Screen Recording and Accessibility…</p>
+        </div>
+        <div class="heading-actions">
+          <button id="check-permissions" class="text-button" type="button">Check</button>
+          <button id="grant-permissions" class="text-button" type="button" hidden>Grant</button>
+        </div>
+      </div>
       <section class="activity-pane" aria-label="This device's activity">
         <div class="section-heading"><div><h2>Command history</h2><p class="subtle">Activity on this PC only</p></div><button id="export" class="text-button" type="button">Export logs</button></div>
         <div class="filters"><input id="search" type="search" placeholder="Search commands" aria-label="Search commands"><select id="status-filter" aria-label="Filter by status"><option value="all">All statuses</option><option value="running">Running</option><option value="completed">Completed</option><option value="error">Failed</option><option value="unknown">Unclear outcome</option><option value="denied">Denied</option></select></div>

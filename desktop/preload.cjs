@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld("metis", {
   getAutostart: () => ipcRenderer.invoke("hub:get-autostart"),
   setAutostart: (value) => ipcRenderer.invoke("hub:set-autostart", value),
   checkUpdates: () => ipcRenderer.invoke("hub:check-updates"),
+  desktopPermissions: (input) => ipcRenderer.invoke("hub:desktop-permissions", input),
   onStatus: (callback) => {
     const listener = (_event, data) => callback(data);
     ipcRenderer.on("hub:status", listener);

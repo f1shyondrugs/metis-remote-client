@@ -56,6 +56,8 @@ h1 { font-size: clamp(25px, 3vw, 31px); line-height: 1.15; letter-spacing: -.045
 .heading-actions { display: flex; gap: 6px; align-items: center; flex: none; }
 .error-banner { background: #fff4f2; color: #912018; border: 1px solid #f2d4d0; padding: 11px 14px; border-radius: 6px; margin-bottom: 18px; font-size: 12px; }
 .device-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; color: var(--muted); font-size: 12px; padding: 0 0 24px; border-bottom: 1px solid var(--line); }
+.permissions-card { align-items: flex-start; justify-content: space-between; }
+.permissions-card .heading-actions { margin-left: auto; }
 .device-state { color: var(--text); font-weight: 600; }
 .device-state.online { color: var(--good); }
 .device-state.error { color: var(--danger); }

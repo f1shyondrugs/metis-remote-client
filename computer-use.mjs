@@ -187,10 +187,10 @@ function finiteInt(value, label, min = -100000, max = 100000) {
 
 export async function computerUse(params = {}, { signal } = {}) {
   const operation = String(params.operation || "");
-  const allowed = ["status", "list_windows", "observe", "move", "click", "scroll", "drag", "type", "key"];
+  const allowed = ["status", "list_windows", "observe", "move", "click", "scroll", "drag", "type", "key", "request_permissions"];
   if (!allowed.includes(operation)) throw new Error("Unsupported computer use operation");
   const payload = { operation };
-  if (!["status", "list_windows"].includes(operation)) {
+  if (!["status", "list_windows", "request_permissions"].includes(operation)) {
     const windowId = String(params.windowId || "");
     if (!/^\d{1,20}$/.test(windowId)) throw new Error("Select a returned window ID");
     payload.windowId = windowId;

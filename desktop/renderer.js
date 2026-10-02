@@ -113,6 +113,28 @@ function selectLog(id) {
   if (entry.status === "unknown") detailField(detail, "Outcome", "The connection ended before Metis AI received a result. The command may have run. Check this PC before retrying.");
 }
 
+async function refreshDesktopPermissions(prompt = false) {
+  const card = byId("desktop-permissions");
+  const grant = byId("grant-permissions");
+  if (!card || !window.metis?.desktopPermissions) return;
+  const unix = state.platform === "darwin" || state.platform === "linux";
+  card.hidden = !unix;
+  if (grant) grant.hidden = state.platform !== "darwin";
+  if (!unix) return;
+  try {
+    const status = await window.metis.desktopPermissions({ prompt });
+    const parts = [];
+    if (typeof status.screenRecording === "boolean") parts.push(`Screen Recording ${status.screenRecording ? "on" : "off"}`);
+    if (typeof status.accessibility === "boolean") parts.push(`Accessibility ${status.accessibility ? "on" : "off"}`);
+    if (status.backend) parts.push(status.backend);
+    byId("desktop-permissions-summary").textContent = status.available
+      ? `Desktop control is ready${parts.length ? ` · ${parts.join(" · ")}` : "."}`
+      : (status.reason || parts.join(" · ") || "Desktop control is blocked until OS permissions are granted.");
+  } catch (error) {
+    byId("desktop-permissions-summary").textContent = error.message || "Could not check desktop permissions";
+  }
+}
+
 async function refresh() {
   if (!state.paired || state.fetching) return;
   state.fetching = true;
@@ -127,6 +149,7 @@ async function refresh() {
     byId("device-meta").textContent = [state.client?.os || "Windows", state.client?.version ? `v${state.client.version}` : null, access].filter(Boolean).join(" · ");
     byId("device-seen").textContent = state.client?.lastSeenAt ? `Last seen ${formatDate(state.client.lastSeenAt)}` : "";
     byId("sync-label").textContent = `Updated ${new Date().toLocaleTimeString()}`;
+    void refreshDesktopPermissions();
     renderCommands();
     if (state.selectedLog) selectLog(state.selectedLog);
   } catch (error) {
@@ -177,6 +200,8 @@ byId("pair-form").addEventListener("submit", async (event) => {
   }
 });
 byId("refresh").addEventListener("click", () => void refresh());
+byId("check-permissions")?.addEventListener("click", () => void refreshDesktopPermissions(false));
+byId("grant-permissions")?.addEventListener("click", () => void refreshDesktopPermissions(true));
 byId("export").addEventListener("click", async () => {
   try { await window.metis.exportAudit(); }
   catch (error) { showHubError(error.message || "Could not export logs"); }

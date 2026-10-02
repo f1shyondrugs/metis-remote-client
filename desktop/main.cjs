@@ -100,8 +100,15 @@ function publicState() {
     server: config?.server || "",
     clientId: config?.clientId || "",
     permissionMode: config?.permissionMode || null,
+    platform: process.platform,
     ...status,
   };
+}
+
+async function desktopPermissionStatus(prompt = false) {
+  if (process.platform === "win32") return { available: true, platform: "win32" };
+  const { unixComputerUse } = await import(pathToFileURL(path.join(__dirname, "computer-use-unix.mjs")).href);
+  return unixComputerUse({ operation: prompt ? "request_permissions" : "status" });
 }
 
 function broadcast() {
@@ -115,6 +122,12 @@ function cancelComputerUse() {
   clearInterval(computerUseCursorTimer);
   computerUseCursorTimer = undefined;
   computerUseOverlay?.hide();
+}
+
+function trayImage() {
+  const file = path.join(__dirname, "assets", process.platform === "win32" ? "icon.ico" : "icon.png");
+  const size = process.platform === "darwin" ? 18 : 16;
+  return nativeImage.createFromPath(file).resize({ width: size, height: size, quality: "best" });
 }
 
 function updateTray() {
@@ -325,6 +338,7 @@ function registerIpc() {
       return status.update;
     }
   });
+  ipcMain.handle("hub:desktop-permissions", async (_event, input) => desktopPermissionStatus(Boolean(input?.prompt)));
 }
 
 function configureUpdater() {
@@ -392,7 +406,7 @@ if (!app.requestSingleInstanceLock()) {
     computerUseOverlay = createComputerUseOverlay({ BrowserWindow, screen, globalShortcut, onCancel: cancelComputerUse });
     registerIpc();
     createWindow();
-    tray = new Tray(nativeImage.createFromPath(path.join(__dirname, "assets", process.platform === "win32" ? "icon.ico" : "icon.png")));
+    tray = new Tray(trayImage());
     updateTray();
     showWindow();
     if (config) {
