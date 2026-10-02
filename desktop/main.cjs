@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
-const { app, BrowserWindow, Menu, Tray, nativeImage, ipcMain, shell, safeStorage, Notification, dialog, screen, globalShortcut } = require("electron");
+const { app, BrowserWindow, Menu, Tray, nativeImage, ipcMain, shell, safeStorage, Notification, dialog, screen, globalShortcut, systemPreferences, desktopCapturer } = require("electron");
 const { createComputerUseOverlay } = require("./computer-use-overlay.cjs");
 const { autoUpdater } = require("electron-updater");
 const fs = require("node:fs");
@@ -105,10 +105,62 @@ function publicState() {
   };
 }
 
+function openMacPrivacySettings() {
+  if (process.platform !== "darwin") return;
+  for (const url of [
+    "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
+    "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+  ]) {
+    spawnSync("open", [url], { timeout: 8000 });
+  }
+}
+
+async function promptMacDesktopPermissions() {
+  try { systemPreferences.isTrustedAccessibilityClient(true); } catch { /* prompt is best-effort */ }
+  try {
+    await desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width: 1, height: 1 } });
+  } catch { /* first Screen Recording prompt, or already denied */ }
+  openMacPrivacySettings();
+}
+
 async function desktopPermissionStatus(prompt = false) {
   if (process.platform === "win32") return { available: true, platform: "win32" };
+  if (prompt && process.platform === "darwin") await promptMacDesktopPermissions();
   const { unixComputerUse } = await import(pathToFileURL(path.join(__dirname, "computer-use-unix.mjs")).href);
-  return unixComputerUse({ operation: prompt ? "request_permissions" : "status" });
+  const status = await unixComputerUse({ operation: prompt ? "request_permissions" : "status" });
+  return prompt && process.platform === "darwin" ? { ...status, openedSettings: true } : status;
+}
+
+function desktopPermissionAlertText(status) {
+  if (!status || status.available) return "";
+  const missing = [];
+  if (status.screenRecording === false) missing.push("Screen Recording");
+  if (status.accessibility === false) missing.push("Accessibility");
+  if (missing.length) {
+    return `${missing.join(" and ")} ${missing.length === 1 ? "is" : "are"} not enabled. Desktop control will not work until you grant them in System Settings, then restart this app.`;
+  }
+  return status.reason || "Desktop control is blocked until OS permissions are granted.";
+}
+
+async function warnIfDesktopPermissionsMissing() {
+  if (process.platform === "win32") return;
+  try {
+    const detail = desktopPermissionAlertText(await desktopPermissionStatus(false));
+    if (!detail) return;
+    const buttons = process.platform === "darwin" ? ["Grant permissions", "OK"] : ["OK"];
+    const { response } = await dialog.showMessageBox({
+      type: "warning",
+      title: APP_NAME,
+      message: "Desktop permissions are not enabled",
+      detail,
+      buttons,
+      defaultId: 0,
+      noLink: true,
+    });
+    if (process.platform === "darwin" && response === 0) await desktopPermissionStatus(true);
+  } catch {
+    // Older installs may not ship the unix helper next to the app.
+  }
 }
 
 function broadcast() {
@@ -417,6 +469,7 @@ if (!app.requestSingleInstanceLock()) {
       }
     }
     setupUpdates();
+    void warnIfDesktopPermissionsMissing();
   });
   app.on("before-quit", () => {
     quitting = true;

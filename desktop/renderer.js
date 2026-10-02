@@ -113,25 +113,63 @@ function selectLog(id) {
   if (entry.status === "unknown") detailField(detail, "Outcome", "The connection ended before Metis AI received a result. The command may have run. Check this PC before retrying.");
 }
 
+function desktopPermissionCopy(status) {
+  const lines = [];
+  if (typeof status.screenRecording === "boolean") lines.push(`Screen Recording: ${status.screenRecording ? "on" : "not enabled"}`);
+  if (typeof status.accessibility === "boolean") lines.push(`Accessibility: ${status.accessibility ? "on" : "not enabled"}`);
+  if (status.available) {
+    return { blocked: false, title: "Desktop control is ready", detail: lines.join(" · ") || "OS permissions are enabled." };
+  }
+  const extra = lines.length
+    ? "Grant them in System Settings, then restart this app."
+    : (status.reason || "Grant the required OS permissions, then restart this app.");
+  return {
+    blocked: true,
+    title: "Desktop permissions are not enabled",
+    detail: `${lines.length ? `${lines.join(". ")}. ` : ""}${extra}`,
+  };
+}
+
 async function refreshDesktopPermissions(prompt = false) {
+  const banner = byId("permission-banner");
   const card = byId("desktop-permissions");
   const grant = byId("grant-permissions");
-  if (!card || !window.metis?.desktopPermissions) return;
+  const bannerGrant = byId("banner-grant");
+  if (!window.metis?.desktopPermissions) return;
   const unix = state.platform === "darwin" || state.platform === "linux";
-  card.hidden = !unix;
+  if (card) card.hidden = !unix || !state.paired;
   if (grant) grant.hidden = state.platform !== "darwin";
-  if (!unix) return;
+  if (bannerGrant) bannerGrant.hidden = state.platform !== "darwin";
+  if (!unix) {
+    if (banner) banner.hidden = true;
+    return;
+  }
   try {
     const status = await window.metis.desktopPermissions({ prompt });
-    const parts = [];
-    if (typeof status.screenRecording === "boolean") parts.push(`Screen Recording ${status.screenRecording ? "on" : "off"}`);
-    if (typeof status.accessibility === "boolean") parts.push(`Accessibility ${status.accessibility ? "on" : "off"}`);
-    if (status.backend) parts.push(status.backend);
-    byId("desktop-permissions-summary").textContent = status.available
-      ? `Desktop control is ready${parts.length ? ` · ${parts.join(" · ")}` : "."}`
-      : (status.reason || parts.join(" · ") || "Desktop control is blocked until OS permissions are granted.");
+    const copy = desktopPermissionCopy(status);
+    if (prompt && !status.available) {
+      copy.title = "Enable these in System Settings";
+      copy.detail = "System Settings opened. Turn on Screen Recording and Accessibility for Metis AI Remote Client, then restart this app.";
+    }
+    if (banner) {
+      banner.hidden = !copy.blocked;
+      byId("permission-banner-title").textContent = copy.title;
+      byId("permission-banner-detail").textContent = copy.detail;
+    }
+    if (card) {
+      card.classList.toggle("is-blocked", copy.blocked);
+      const title = byId("desktop-permissions-title");
+      if (title) title.textContent = copy.title;
+      byId("desktop-permissions-summary").textContent = copy.detail;
+    }
   } catch (error) {
-    byId("desktop-permissions-summary").textContent = error.message || "Could not check desktop permissions";
+    const message = error.message || "Could not check desktop permissions";
+    if (banner) {
+      banner.hidden = false;
+      byId("permission-banner-title").textContent = "Desktop permissions are not enabled";
+      byId("permission-banner-detail").textContent = message;
+    }
+    if (byId("desktop-permissions-summary")) byId("desktop-permissions-summary").textContent = message;
   }
 }
 
@@ -170,6 +208,7 @@ async function initialize() {
   try {
     setConnection(await window.metis.state());
     byId("autostart").checked = await window.metis.getAutostart();
+    void refreshDesktopPermissions();
     if (state.paired) await refresh();
   } catch (error) {
     byId("pair-error").textContent = error.message || "Could not initialize the app";
@@ -202,6 +241,7 @@ byId("pair-form").addEventListener("submit", async (event) => {
 byId("refresh").addEventListener("click", () => void refresh());
 byId("check-permissions")?.addEventListener("click", () => void refreshDesktopPermissions(false));
 byId("grant-permissions")?.addEventListener("click", () => void refreshDesktopPermissions(true));
+byId("banner-grant")?.addEventListener("click", () => void refreshDesktopPermissions(true));
 byId("export").addEventListener("click", async () => {
   try { await window.metis.exportAudit(); }
   catch (error) { showHubError(error.message || "Could not export logs"); }

@@ -31,6 +31,12 @@ func run() throws {
         let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(opts)
         _ = CGRequestScreenCaptureAccess()
+        for value in [
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+        ] {
+            if let url = URL(string: value) { NSWorkspace.shared.open(url) }
+        }
     }
     let accessibility = AXIsProcessTrusted(), capture = CGPreflightScreenCaptureAccess()
     let session = CGSessionCopyCurrentDictionary() as? [String: Any]

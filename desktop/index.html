@@ -12,6 +12,13 @@
     <div class="brand"><img src="./assets/icon.png" alt="" width="40" height="40"><div><strong>Metis AI</strong><span>Remote Client</span></div></div>
     <div class="topbar-right"><span id="connection-dot" class="status-dot"></span><span id="connection-label">Offline</span><button id="open-server" class="text-button" type="button" hidden>Open Metis AI ↗</button></div>
   </header>
+  <div id="permission-banner" class="permission-banner" role="alert" hidden>
+    <div>
+      <strong id="permission-banner-title">Desktop permissions are not enabled</strong>
+      <p id="permission-banner-detail">Checking Screen Recording and Accessibility…</p>
+    </div>
+    <button id="banner-grant" class="permission-grant" type="button" hidden>Grant</button>
+  </div>
   <main>
     <section id="pair-view" class="pair-view">
       <div class="pair-panel">
@@ -49,12 +56,12 @@
       <div class="device-summary"><strong>Computer Use</strong><span class="subtle">Managed in Metis AI → Settings → Devices.</span></div>
       <div id="desktop-permissions" class="device-summary permissions-card" hidden>
         <div>
-          <strong>Desktop permissions</strong>
+          <strong id="desktop-permissions-title">Desktop permissions</strong>
           <p id="desktop-permissions-summary" class="subtle">Checking Screen Recording and Accessibility…</p>
         </div>
         <div class="heading-actions">
           <button id="check-permissions" class="text-button" type="button">Check</button>
-          <button id="grant-permissions" class="text-button" type="button" hidden>Grant</button>
+          <button id="grant-permissions" class="permission-grant" type="button" hidden>Grant</button>
         </div>
       </div>
       <section class="activity-pane" aria-label="This device's activity">

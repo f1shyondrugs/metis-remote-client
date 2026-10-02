@@ -4,3 +4,6 @@ dist/
 .env
 .env.*
 .DS_Store
+desktop/computer-use-unix.mjs
+desktop/metis-desktop-helper
+desktop/metis-desktop-helper.swift

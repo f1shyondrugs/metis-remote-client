@@ -55,6 +55,13 @@ h1 { font-size: clamp(25px, 3vw, 31px); line-height: 1.15; letter-spacing: -.045
 .page-heading h1 { margin-bottom: 7px; overflow-wrap: anywhere; }
 .heading-actions { display: flex; gap: 6px; align-items: center; flex: none; }
 .error-banner { background: #fff4f2; color: #912018; border: 1px solid #f2d4d0; padding: 11px 14px; border-radius: 6px; margin-bottom: 18px; font-size: 12px; }
+.permission-banner { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 12px 32px; background: #fff6eb; color: #7a4b08; border-bottom: 1px solid #ead7b8; font-size: 13px; }
+.permission-banner strong { display: block; margin-bottom: 4px; }
+.permission-banner p { margin: 0; line-height: 1.4; }
+.permission-grant { flex: none; min-height: 36px; padding: 0 14px; border-radius: 6px; border: 1px solid #7a4b08; background: #7a4b08; color: #fff6eb; font-weight: 600; }
+.permission-grant:hover { opacity: .9; }
+.permissions-card.is-blocked { color: #7a4b08; }
+.permissions-card.is-blocked strong { color: #7a4b08; }
 .device-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; color: var(--muted); font-size: 12px; padding: 0 0 24px; border-bottom: 1px solid var(--line); }
 .permissions-card { align-items: flex-start; justify-content: space-between; }
 .permissions-card .heading-actions { margin-left: auto; }
@@ -113,5 +120,8 @@ h1 { font-size: clamp(25px, 3vw, 31px); line-height: 1.15; letter-spacing: -.045
   :root { color-scheme: dark; --bg: #202020; --surface: #252525; --text: #f2f2f2; --muted: #aaa; --line: #393939; --hover: #303030; --focus: #bcbcbc; --danger: #ef8f89; --good: #80ca9c; --warning: #e0bb70; }
   .pair-panel input, .filters input, .filters select { border-color: #444; }
   .error-banner { background: #382321; border-color: #58312d; color: #ffd0cb; }
+  .permission-banner { background: #3a2a12; color: #f3d19a; border-bottom-color: #5a4320; }
+  .permission-grant { background: #f3d19a; color: #2a1c08; border-color: #f3d19a; }
+  .permissions-card.is-blocked, .permissions-card.is-blocked strong { color: #f3d19a; }
   .menu-panel { box-shadow: 0 10px 28px #0006; }
 }
