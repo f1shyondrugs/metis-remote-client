@@ -8,4 +8,4 @@ assets = root / "assets"
 assets.mkdir(exist_ok=True)
 shutil.copyfile(source, assets / "icon.ico")
 with Image.open(source) as icon:
-    icon.convert("RGBA").resize((256, 256), Image.LANCZOS).save(assets / "icon.png")
+    icon.convert("RGBA").resize((512, 512), Image.LANCZOS).save(assets / "icon.png")
