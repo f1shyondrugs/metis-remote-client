@@ -26,7 +26,7 @@ npm ci --prefix desktop
 npm run build:win --prefix desktop -- --publish never
 ```
 
-The Windows build writes `desktop/dist/Metis-AI-Remote-Client-Setup.exe` and `desktop/dist/latest.yml`. macOS writes `Metis-AI-Remote-Client-arm64.dmg`. Linux writes `Metis-AI-Remote-Client-x86_64.AppImage`. Push a tag matching `desktop/package.json`, such as `v1.4.0`, to publish release assets. Builds are currently unsigned.
+The Windows build writes `desktop/dist/Metis-AI-Remote-Client-Setup.exe` and `desktop/dist/latest.yml`. macOS writes `Metis-AI-Remote-Client-arm64.dmg`. Linux writes `Metis-AI-Remote-Client-x86_64.AppImage`. Push a tag matching `desktop/package.json`, such as `v1.4.2`, to publish release assets. Builds are currently unsigned.
 
 ```bash
 npm ci --prefix desktop
