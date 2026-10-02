@@ -27,6 +27,7 @@ function isElevated() {
 }
 
 function getAutostart() {
+  if (process.platform === "darwin") return app.getLoginItemSettings().openAtLogin;
   if (process.platform !== "win32") return false;
   try {
     return runPowerShell(`$task = Get-ScheduledTask -TaskName ${psQuote(AUTOSTART_TASK)} -ErrorAction SilentlyContinue; [bool]$task`) === "True";
@@ -34,6 +35,10 @@ function getAutostart() {
 }
 
 function setAutostart(enabled) {
+  if (process.platform === "darwin") {
+    app.setLoginItemSettings({ openAtLogin: Boolean(enabled) });
+    return app.getLoginItemSettings().openAtLogin;
+  }
   if (process.platform !== "win32") return false;
   const taskName = psQuote(AUTOSTART_TASK);
   if (enabled) {
@@ -65,7 +70,7 @@ function loadConfig() {
   if (!fs.existsSync(configPath())) return null;
   const saved = JSON.parse(fs.readFileSync(configPath(), "utf8"));
   if (!saved.encryptedCredential || !safeStorage.isEncryptionAvailable()) {
-    throw new Error("Windows credential storage is unavailable");
+    throw new Error("OS credential storage is unavailable");
   }
   return {
     server: saved.server,
@@ -77,7 +82,7 @@ function loadConfig() {
 
 function saveConfig(next) {
   if (!safeStorage.isEncryptionAvailable()) {
-    throw new Error("Windows credential storage is unavailable");
+    throw new Error("OS credential storage is unavailable");
   }
   const saved = {
     server: next.server,
@@ -188,7 +193,7 @@ async function startRuntime() {
   runtime = clientModule.startRemoteClient({
     config,
     configPath: configPath(),
-    desktopGuiAvailable: () => process.platform === "win32" && screen.getAllDisplays().length > 0,
+    desktopGuiAvailable: () => ["win32", "darwin", "linux"].includes(process.platform) && screen.getAllDisplays().length > 0,
     onEvent(event) {
       if (event.type === "computer_use") {
         if (event.phase === "start") {
@@ -252,7 +257,7 @@ function registerIpc() {
         token,
         name: os.hostname(),
         hostname: os.hostname(),
-        os: `windows ${os.release()}`,
+        os: process.platform === "darwin" ? "macos" : process.platform === "linux" ? "linux" : `windows ${os.release()}`,
         architecture: os.arch(),
         version: app.getVersion(),
         permissionMode,
@@ -387,7 +392,7 @@ if (!app.requestSingleInstanceLock()) {
     computerUseOverlay = createComputerUseOverlay({ BrowserWindow, screen, globalShortcut, onCancel: cancelComputerUse });
     registerIpc();
     createWindow();
-    tray = new Tray(nativeImage.createFromPath(path.join(__dirname, "assets", "icon.ico")));
+    tray = new Tray(nativeImage.createFromPath(path.join(__dirname, "assets", process.platform === "win32" ? "icon.ico" : "icon.png")));
     updateTray();
     showWindow();
     if (config) {

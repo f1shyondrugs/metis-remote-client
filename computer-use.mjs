@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
+import { unixComputerUse } from "./computer-use-unix.mjs";
 
 const execFileAsync = promisify(execFile);
 const observations = new Map();
@@ -185,7 +186,6 @@ function finiteInt(value, label, min = -100000, max = 100000) {
 }
 
 export async function computerUse(params = {}, { signal } = {}) {
-  if (process.platform !== "win32") throw new Error("Computer Use requires a Windows GUI client");
   const operation = String(params.operation || "");
   const allowed = ["status", "list_windows", "observe", "move", "click", "scroll", "drag", "type", "key"];
   if (!allowed.includes(operation)) throw new Error("Unsupported computer use operation");
@@ -200,6 +200,8 @@ export async function computerUse(params = {}, { signal } = {}) {
     if (!observation || observation.windowId !== payload.windowId || Date.now() - observation.at > MAX_AGE_MS) {
       throw new Error("Observe this window again before acting");
     }
+    payload.expectedGeometry = observation.geometry;
+    payload.coordinateScale = observation.scale;
     observations.delete(String(params.observationId));
   }
   if (["move", "click", "scroll", "drag"].includes(operation)) {
@@ -223,6 +225,14 @@ export async function computerUse(params = {}, { signal } = {}) {
     if (typeof params.key !== "string" || !/^[A-Za-z0-9+ ]{1,60}$/.test(params.key)) throw new Error("Invalid key chord");
     payload.key = params.key;
   }
+  if (payload.coordinateScale) {
+    for (const key of ["x", "toX"]) if (key in payload) payload[key] = Math.floor(payload[key] * payload.coordinateScale.x);
+    for (const key of ["y", "toY"]) if (key in payload) payload[key] = Math.floor(payload[key] * payload.coordinateScale.y);
+  }
+  let result;
+  if (process.platform !== "win32") {
+    result = await unixComputerUse(payload, { signal });
+  } else {
   const encoded = Buffer.from(JSON.stringify(payload)).toString("base64");
   const command = Buffer.from(SCRIPT.replace("$args[0]", `'${encoded}'`), "utf16le").toString("base64");
   let stdout;
@@ -240,11 +250,16 @@ export async function computerUse(params = {}, { signal } = {}) {
     const detail = match?.[1]?.split("_x000D__x000A_")[0]?.replaceAll("&amp;", "&").replaceAll("&lt;", "<").replaceAll("&gt;", ">")?.trim();
     throw new Error(detail || (error?.killed ? "Computer Use timed out" : "Computer Use failed on Windows"));
   }
-  const result = JSON.parse(stdout.trim());
+  result = JSON.parse(stdout.trim());
+  }
   if (operation === "observe") {
     const observationId = randomUUID();
     observations.clear();
-    observations.set(observationId, { windowId: payload.windowId, at: Date.now() });
+    observations.set(observationId, { windowId: payload.windowId, at: Date.now(),
+      geometry: process.platform !== "win32" ? { x: result.x, y: result.y,
+        width: result.coordinateWidth ?? result.width, height: result.coordinateHeight ?? result.height } : undefined,
+      scale: { x: (result.coordinateWidth ?? result.width) / result.width,
+        y: (result.coordinateHeight ?? result.height) / result.height } });
     return { ...result, observationId };
   }
   return result;

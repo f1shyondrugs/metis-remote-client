@@ -48,3 +48,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${{ github.ref_name }}" "desktop/dist/Metis-AI-Remote-Client-Setup.exe" "desktop/dist/latest.yml" --title "Metis AI Remote Client ${{ github.ref_name }}" --generate-notes --verify-tag
+          if ($LASTEXITCODE -ne 0) {
+            gh release upload "${{ github.ref_name }}" "desktop/dist/Metis-AI-Remote-Client-Setup.exe" "desktop/dist/latest.yml" --clobber
+          }
