@@ -149,26 +149,48 @@ func handle(_ p: [String: Any]) throws -> [String: Any] {
     return ["ok": true, "windowId": idString]
 }
 
-@_cdecl("metis_desktop_run")
-public func metis_desktop_run(_ jsonC: UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>? {
-    func encoded(_ value: [String: Any]) -> UnsafeMutablePointer<CChar>? {
-        guard let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]),
-              let text = String(data: data, encoding: .utf8) else { return strdup("{\"error\":\"Desktop request failed\"}") }
-        return strdup(text)
+private let resultLock = NSLock()
+private var lastResult: UnsafeMutablePointer<CChar>?
+
+func encodeDesktop(_ value: [String: Any]) -> UnsafeMutablePointer<CChar> {
+    let fallback = "{\"error\":\"Desktop request failed\"}"
+    let text: String
+    if let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]),
+       let encoded = String(data: data, encoding: .utf8) {
+        text = encoded
+    } else {
+        text = fallback
     }
+    resultLock.lock()
+    if let lastResult { free(lastResult) }
+    let pointer = strdup(text) ?? strdup(fallback)!
+    lastResult = pointer
+    resultLock.unlock()
+    return pointer
+}
+
+func metis_desktop_run_impl(_ jsonC: UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar> {
     guard let jsonC, let data = String(cString: jsonC).data(using: .utf8),
           let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-        return encoded(["error": "Invalid desktop request"])
+        return encodeDesktop(["error": "Invalid desktop request"])
     }
-    do { return encoded(try handle(parsed)) }
+    do { return encodeDesktop(try handle(parsed)) }
     catch {
         let message: String
         if case DesktopError.message(let detail) = error { message = detail } else { message = String(describing: error) }
-        return encoded(["error": message])
+        return encodeDesktop(["error": message])
     }
 }
 
-@_cdecl("metis_desktop_free")
-public func metis_desktop_free(_ ptr: UnsafeMutablePointer<CChar>?) {
-    free(ptr)
+@_cdecl("metis_desktop_run")
+public func metis_desktop_run(_ jsonC: UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar> {
+    if Thread.isMainThread { return metis_desktop_run_impl(jsonC) }
+    var result: UnsafeMutablePointer<CChar>!
+    let gate = DispatchSemaphore(value: 0)
+    DispatchQueue.main.async {
+        result = metis_desktop_run_impl(jsonC)
+        gate.signal()
+    }
+    gate.wait()
+    return result
 }

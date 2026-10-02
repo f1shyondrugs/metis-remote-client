@@ -22,6 +22,8 @@ test("macOS computer use loads an in-process library instead of a helper process
   const client = readFileSync(new URL("../client.mjs", import.meta.url), "utf8");
   assert.match(unix, /libmetisdesktop\.dylib/);
   assert.match(unix, /koffi\.load/);
+  assert.match(unix, /metis_desktop_run", "str"/);
+  assert.equal(unix.includes("koffi.decode"), false);
   assert.equal(unix.includes("metis-desktop-helper\""), false);
   assert.match(unix, /app\.asar\.unpacked/);
   assert.match(client, /platform === "darwin"/);

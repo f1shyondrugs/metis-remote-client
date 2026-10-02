@@ -16,22 +16,14 @@ function runDarwinDesktop(payload) {
   if (!darwinLib) {
     const koffi = require("koffi");
     const lib = koffi.load(darwinLibPath);
-    darwinLib = {
-      koffi,
-      run: lib.func("metis_desktop_run", "void *", ["str"]),
-      free: lib.func("metis_desktop_free", "void", ["void *"]),
-    };
+    // Return type must be str. void* + decode treats the JSON bytes as a pointer and SIGSEGV.
+    darwinLib = { run: lib.func("metis_desktop_run", "str", ["str"]) };
   }
-  const ptr = darwinLib.run(JSON.stringify(payload));
-  if (!ptr) throw new Error("Desktop control failed");
-  try {
-    const text = darwinLib.koffi.decode(ptr, "char *");
-    const result = JSON.parse(text);
-    if (result && typeof result.error === "string") throw new Error(result.error);
-    return result;
-  } finally {
-    darwinLib.free(ptr);
-  }
+  const text = darwinLib.run(JSON.stringify(payload));
+  if (typeof text !== "string" || !text) throw new Error("Desktop control failed");
+  const result = JSON.parse(text);
+  if (result && typeof result.error === "string") throw new Error(result.error);
+  return result;
 }
 const options = { timeout: 30_000, maxBuffer: 32 * 1024 * 1024 };
 const keys = { ctrl: "ctrl", control: "ctrl", shift: "shift", alt: "alt", meta: "super", super: "super",
