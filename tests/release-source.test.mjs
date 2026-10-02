@@ -19,8 +19,12 @@ test("packaged client updates from the public remote-client repository without p
 
 test("macOS computer use loads an in-process library instead of a helper process", () => {
   const unix = readFileSync(new URL("../computer-use-unix.mjs", import.meta.url), "utf8");
+  const client = readFileSync(new URL("../client.mjs", import.meta.url), "utf8");
   assert.match(unix, /libmetisdesktop\.dylib/);
   assert.match(unix, /koffi\.load/);
   assert.equal(unix.includes("metis-desktop-helper\""), false);
+  assert.match(unix, /app\.asar\.unpacked/);
+  assert.match(client, /platform === "darwin"/);
+  assert.match(client, /computer-use\.mjs/);
   assert.match(String(pkg.dependencies.koffi), /\^2\./);
 });

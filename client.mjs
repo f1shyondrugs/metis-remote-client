@@ -86,8 +86,26 @@ export function startRemoteClient({ config: suppliedConfig, configPath, onEvent 
     return worker;
   }
 
+  function unpackedHref(relative) {
+    const url = new URL(relative, import.meta.url);
+    url.pathname = url.pathname.replace("/app.asar/", "/app.asar.unpacked/");
+    return url.href;
+  }
+
+  let darwinComputerUse;
+
   function runComputerUse(params, signal) {
     if (signal.aborted) return Promise.reject(new Error("Computer Use was cancelled"));
+    // AppKit must load on the Electron main thread. A worker load crashes the app.
+    if (process.platform === "darwin") {
+      const load = darwinComputerUse
+        ? Promise.resolve(darwinComputerUse)
+        : import(unpackedHref("./computer-use.mjs")).then((module) => {
+            darwinComputerUse = module.computerUse;
+            return darwinComputerUse;
+          });
+      return load.then((run) => run(params, { signal }));
+    }
     const worker = ensureComputerUseWorker();
     const id = randomUUID();
     return new Promise((resolve, reject) => {

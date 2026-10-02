@@ -8,7 +8,8 @@ import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
 const exec = promisify(execFile);
-const darwinLibPath = process.env.METIS_DESKTOP_LIB || fileURLToPath(new URL("./libmetisdesktop.dylib", import.meta.url));
+const darwinLibPath = process.env.METIS_DESKTOP_LIB || fileURLToPath(new URL("./libmetisdesktop.dylib", import.meta.url))
+  .replace(`${path.sep}app.asar${path.sep}`, `${path.sep}app.asar.unpacked${path.sep}`);
 let darwinLib;
 
 function runDarwinDesktop(payload) {
