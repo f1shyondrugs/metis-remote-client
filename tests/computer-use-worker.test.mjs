@@ -14,12 +14,11 @@ test("Computer Use runs behind the worker message boundary", async () => {
         clearTimeout(timeout);
         resolve(message);
       });
-      worker.postMessage({ type: "run", id, params: { operation: "status" } });
+      worker.postMessage({ type: "run", id, params: { operation: "worker_boundary_probe" } });
     });
     assert.equal(response.id, id);
-    assert.ok(response.type === "result" || response.type === "error");
-    if (response.type === "result") assert.equal(typeof response.result.available, "boolean");
-    else assert.match(response.error?.message || "", /desktop|display|permission|X11|Screen Recording|Windows/i);
+    assert.equal(response.type, "error");
+    assert.match(response.error?.message || "", /Unsupported computer use operation/);
   } finally {
     await worker.terminate();
   }
