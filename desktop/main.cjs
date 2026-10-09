@@ -2,6 +2,7 @@
 const { app, BrowserWindow, Menu, Tray, nativeImage, ipcMain, shell, safeStorage, Notification, dialog, screen, globalShortcut, systemPreferences, desktopCapturer } = require("electron");
 const { createComputerUseOverlay } = require("./computer-use-overlay.cjs");
 const { autoUpdater } = require("electron-updater");
+const { createCredentialStore } = require("./credential-store.cjs");
 const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
@@ -66,33 +67,9 @@ function configPath() {
   return path.join(app.getPath("userData"), "config.json");
 }
 
-function loadConfig() {
-  if (!fs.existsSync(configPath())) return null;
-  const saved = JSON.parse(fs.readFileSync(configPath(), "utf8"));
-  if (!saved.encryptedCredential || !safeStorage.isEncryptionAvailable()) {
-    throw new Error("OS credential storage is unavailable");
-  }
-  return {
-    server: saved.server,
-    clientId: saved.clientId,
-    credential: safeStorage.decryptString(Buffer.from(saved.encryptedCredential, "base64")),
-    permissionMode: saved.permissionMode === "user" ? "user" : "admin",
-  };
-}
-
-function saveConfig(next) {
-  if (!safeStorage.isEncryptionAvailable()) {
-    throw new Error("OS credential storage is unavailable");
-  }
-  const saved = {
-    server: next.server,
-    clientId: next.clientId,
-    permissionMode: next.permissionMode,
-    encryptedCredential: safeStorage.encryptString(next.credential).toString("base64"),
-  };
-  fs.mkdirSync(path.dirname(configPath()), { recursive: true });
-  fs.writeFileSync(configPath(), JSON.stringify(saved), { encoding: "utf8", mode: 0o600 });
-}
+const credentialStore = createCredentialStore({ file: configPath(), safeStorage });
+function loadConfig() { return credentialStore.load(); }
+function saveConfig(next) { credentialStore.save(next); }
 
 function publicState() {
   return {

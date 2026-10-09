@@ -39,3 +39,9 @@ Download the app from this repository's latest GitHub Release. Packaged clients 
 - Command output in the server audit is redacted and shortened. `REMOTE_AUDIT_RETENTION_DAYS` sets its retention period (default 30, maximum 365).
 - Public GitHub Releases are checked at startup and every six hours in packaged builds.
 - The older PowerShell client remains available for existing installations until they are replaced through the Windows app.
+
+## Linux pairing without a keyring
+
+Linux pairing works without GNOME Keyring or KWallet, including CachyOS/Hyprland. When a real OS keyring is available, the app encrypts the credential as before. Otherwise it stores the credential unencrypted in the user-only `config.json` under the app-data directory (`MetisAI/RemoteClient`): directory permissions 0700, file permissions 0600. It migrates this file to keyring encryption when a keyring becomes available. Windows and macOS retain OS encryption.
+
+An existing encrypted pairing still needs its original unlocked keyring; if that keyring is lost, pair the device again. Pairing and terminal/file access do not require X11. Linux Computer Use continues to require X11; Wayland desktop control is not supported.

@@ -12,7 +12,7 @@ Windows releases include `latest.yml` for automatic updates. The app checks this
 
 1. Install the EXE, DMG, or AppImage from the latest release.
 2. In Metis AI, open **Settings → Devices → Add client** and choose the matching OS.
-3. Open the app and enter the server URL and pairing code. On Windows, admin access requires launching the app as administrator and confirming UAC. On macOS, grant Screen Recording and Accessibility for desktop control. On Linux, use an X11 session with `xdotool`, `wmctrl`, and ImageMagick.
+3. Open the app and enter the server URL and pairing code. On Windows, admin access requires launching the app as administrator and confirming UAC. On macOS, grant Screen Recording and Accessibility for desktop control. On Linux, terminal and file access also work in Wayland sessions such as Hyprland. Desktop control requires an X11 session with `xdotool`, `wmctrl`, and ImageMagick.
 
 The pairing code expires after 15 minutes. See [desktop/README.md](desktop/README.md) for permissions and Computer Use details.
 

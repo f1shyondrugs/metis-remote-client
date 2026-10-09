@@ -1,6 +1,6 @@
 {
   "name": "metis-ai-remote-client",
-  "version": "1.4.5",
+  "version": "1.4.6",
   "private": true,
   "description": "Metis AI Remote Client Hub",
   "main": "main.cjs",
@@ -49,7 +49,8 @@
       "assets/icon.ico",
       "assets/icon.png",
       "node_modules/**/*",
-      "package.json"
+      "package.json",
+      "credential-store.cjs"
     ],
     "directories": {
       "output": "dist"
