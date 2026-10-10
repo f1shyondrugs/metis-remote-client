@@ -4,7 +4,7 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
 fs.mkdirSync(path.join(__dirname, "assets"), { recursive: true });
-for (const file of ["client.mjs", "computer-use.mjs", "computer-use-worker.mjs", "computer-use-unix.mjs", "metis-desktop-helper.swift"]) {
+for (const file of ["notification-client.mjs", "client.mjs", "computer-use.mjs", "computer-use-worker.mjs", "computer-use-unix.mjs", "metis-desktop-helper.swift"]) {
   fs.copyFileSync(path.join(__dirname, "..", file), path.join(__dirname, file));
 }
 if (process.platform === "darwin") {

@@ -232,10 +232,13 @@ async function startRuntime() {
   runtime = null;
   if (!config) return;
   const clientModule = await import(pathToFileURL(path.join(__dirname, "client.mjs")).href);
+  const { showNativeNotification } = require("./notification-native.cjs");
   runtime = clientModule.startRemoteClient({
     config,
     configPath: configPath(),
     desktopGuiAvailable: () => ["win32", "darwin", "linux"].includes(process.platform) && screen.getAllDisplays().length > 0,
+    nativeNotificationsAvailable: () => screen.getAllDisplays().length > 0 && Notification.isSupported(),
+    showNotification: notification => showNativeNotification({ Notification, openExternal: url => shell.openExternal(url), server: config.server, notification }),
     onEvent(event) {
       if (event.type === "computer_use") {
         if (event.phase === "start") {
