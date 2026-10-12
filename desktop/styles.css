@@ -69,6 +69,12 @@ h1 { font-size: clamp(25px, 3vw, 31px); line-height: 1.15; letter-spacing: -.045
 .device-state.online { color: var(--good); }
 .device-state.error { color: var(--danger); }
 .device-state.connecting { color: var(--warning); }
+.capture-setting { padding-top: 20px; }
+.capture-copy { width: 100%; }
+.capture-setting .menu-item.check { padding: 0; min-height: 36px; align-items: flex-start; line-height: 1.5; font-size: 13px; }
+.capture-setting .menu-item.check input { margin-top: 2px; }
+.capture-setting .subtle { margin: 4px 0 0 24px; max-width: 72ch; }
+.capture-setting .error-text { margin: 8px 0 0 24px; }
 .activity-pane { min-width: 0; }
 .section-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; padding: 26px 0 18px; }
 .section-heading h2 { font-size: 16px; font-weight: 600; margin: 0 0 4px; letter-spacing: -.02em; }

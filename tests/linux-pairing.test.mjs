@@ -5,7 +5,7 @@ import path from "node:path";
 import vm from "node:vm";
 import { createRequire } from "node:module";
 import test from "node:test";
-const require = createRequire(import.meta.url);
+const require = createRequire(new URL("../desktop/main.cjs", import.meta.url));
 const main = fs.readFileSync(new URL("../desktop/main.cjs", import.meta.url), "utf8");
 test("Linux hub:pair without keyring or X11 saves, resumes and unpairs a terminal-capable client", async t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "metis-linux-pairing-"));
@@ -23,7 +23,7 @@ test("Linux hub:pair without keyring or X11 saves, resumes and unpairs a termina
   const context = vm.createContext({
     require: name => name === "electron" ? electron : name === "electron-updater" ? { autoUpdater: {} }
       : name === "./computer-use-overlay.cjs" ? { createComputerUseOverlay() {} }
-      : name === "./credential-store.cjs" ? { createCredentialStore: options => require("../desktop/credential-store.cjs").createCredentialStore({ ...options, platform: "linux" }) } : require(name),
+      : name === "./credential-store.cjs" ? { createCredentialStore: options => require("./credential-store.cjs").createCredentialStore({ ...options, platform: "linux" }) } : require(name),
     process: { platform: "linux", env: { WAYLAND_DISPLAY: "wayland-1", XDG_SESSION_TYPE: "wayland" } },
     __dirname: path.resolve("desktop"), Buffer, URL, AbortSignal, console,
     fetch: async (url, init) => { enrollment = { url, body: JSON.parse(init.body) };

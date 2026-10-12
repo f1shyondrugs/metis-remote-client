@@ -5,7 +5,7 @@ import overlayPackage from "../desktop/computer-use-overlay.cjs";
 
 const { createComputerUseOverlay } = overlayPackage;
 
-test("computer-use overlay covers every display and stays out of captures", () => {
+function fixture(hideFromCapture = true) {
   const displays = [
     { id: 1, bounds: { x: -1920, y: 0, width: 1920, height: 1080 } },
     { id: 2, bounds: { x: 0, y: 0, width: 2560, height: 1440 } },
@@ -40,7 +40,12 @@ test("computer-use overlay covers every display and stays out of captures", () =
     register(key, callback) { assert.equal(key, "Escape"); escape = callback; return true; },
     unregister(key) { assert.equal(key, "Escape"); escape = undefined; },
   };
-  const overlay = createComputerUseOverlay({ BrowserWindow, screen, globalShortcut, onCancel: () => { cancelled++; } });
+  const overlay = createComputerUseOverlay({ BrowserWindow, screen, globalShortcut, onCancel: () => { cancelled++; }, hideFromCapture });
+  return { overlay, windows, screen, displays, getEscape: () => escape, getCancelled: () => cancelled };
+}
+
+test("computer-use overlay covers every display and stays out of captures", () => {
+  const { overlay, windows, getEscape, getCancelled } = fixture();
 
   overlay.touch();
   assert.equal(windows.length, 2);
@@ -69,10 +74,37 @@ test("computer-use overlay covers every display and stays out of captures", () =
   overlay.resumeCapture();
   assert.ok(windows.every((item) => item.visible));
 
-  escape();
-  assert.equal(cancelled, 1);
+  getEscape()();
+  assert.equal(getCancelled(), 1);
   assert.ok(windows.every((item) => !item.visible));
-  assert.equal(escape, undefined);
+  assert.equal(getEscape(), undefined);
   overlay.resumeCapture();
   assert.ok(windows.every((item) => !item.visible));
+});
+
+
+test("stream visibility switches live and applies to new monitors without ending control", () => {
+  const { overlay, windows, screen, displays, getEscape, getCancelled } = fixture(false);
+  try {
+    overlay.touch();
+    assert.ok(windows.every(w => w.visible && !w.protected));
+    overlay.setHideFromCapture(true);
+    assert.ok(windows.every(w => w.visible && w.protected));
+    overlay.suspendCapture();
+    overlay.setHideFromCapture(false);
+    assert.ok(windows.every(w => !w.visible && !w.protected));
+    displays.push({ id: 3, bounds: { x: 2560, y: 0, width: 1920, height: 1080 } });
+    screen.emit("display-added");
+    assert.equal(windows.length, 3);
+    assert.ok(windows.every(w => !w.visible && !w.protected));
+    overlay.resumeCapture();
+    assert.ok(windows.every(w => w.visible && !w.protected));
+    windows[0].destroyed = true;
+    windows[0].setContentProtection = () => { throw Error("Destroyed window touched"); };
+    overlay.setHideFromCapture(true);
+    assert.ok(windows.slice(1).every(w => w.protected));
+    assert.equal(getCancelled(), 0);
+    assert.equal(typeof getEscape(), "function");
+    assert.throws(() => overlay.setHideFromCapture("false"), /boolean/);
+  } finally { overlay.hide(); }
 });

@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld("metis", {
   unpair: () => ipcRenderer.invoke("hub:unpair"),
   openServer: () => ipcRenderer.invoke("hub:open-server"),
   exportAudit: () => ipcRenderer.invoke("hub:export"),
+  setOverlayCaptureHidden: (value) => ipcRenderer.invoke("hub:set-overlay-capture-hidden", value),
   getAutostart: () => ipcRenderer.invoke("hub:get-autostart"),
   setAutostart: (value) => ipcRenderer.invoke("hub:set-autostart", value),
   checkUpdates: () => ipcRenderer.invoke("hub:check-updates"),

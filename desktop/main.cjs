@@ -3,6 +3,7 @@ const { app, BrowserWindow, Menu, Tray, nativeImage, ipcMain, shell, safeStorage
 const { createComputerUseOverlay } = require("./computer-use-overlay.cjs");
 const { autoUpdater } = require("electron-updater");
 const { createCredentialStore } = require("./credential-store.cjs");
+const { createOverlayPreferences } = require("./overlay-preferences.cjs");
 const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
@@ -57,6 +58,7 @@ let window;
 let tray;
 let runtime;
 let computerUseOverlay;
+let overlayPreferences;
 let computerUseCursorTimer;
 let config;
 let quitting = false;
@@ -71,6 +73,20 @@ const credentialStore = createCredentialStore({ file: configPath(), safeStorage 
 function loadConfig() { return credentialStore.load(); }
 function saveConfig(next) { credentialStore.save(next); }
 
+function setOverlayCaptureHidden(value) {
+  if (typeof value !== "boolean") throw new TypeError("Capture visibility must be a boolean");
+  const previous = overlayPreferences.get();
+  try {
+    computerUseOverlay.setHideFromCapture(value);
+    overlayPreferences.set(value);
+  } catch (error) {
+    computerUseOverlay.setHideFromCapture(previous);
+    throw error;
+  }
+  broadcast();
+  return value;
+}
+
 function publicState() {
   return {
     paired: Boolean(config),
@@ -78,6 +94,7 @@ function publicState() {
     clientId: config?.clientId || "",
     permissionMode: config?.permissionMode || null,
     platform: process.platform,
+    hideOverlayFromCapture: overlayPreferences?.get() ?? true,
     ...status,
   };
 }
@@ -352,6 +369,7 @@ function registerIpc() {
     fs.writeFileSync(result.filePath, JSON.stringify({ exportedAt: new Date().toISOString(), audit: snapshot.audit }, null, 2), "utf8");
     return true;
   });
+  ipcMain.handle("hub:set-overlay-capture-hidden", (_event, value) => setOverlayCaptureHidden(value));
   ipcMain.handle("hub:get-autostart", () => getAutostart());
   ipcMain.handle("hub:set-autostart", (_event, value) => {
     const enabled = setAutostart(Boolean(value));
@@ -435,7 +453,18 @@ if (!app.requestSingleInstanceLock()) {
       app.setLoginItemSettings({ openAtLogin: false, path: process.execPath });
       try { setAutostart(true); } catch (error) { status.error = error.message; }
     }
-    computerUseOverlay = createComputerUseOverlay({ BrowserWindow, screen, globalShortcut, onCancel: cancelComputerUse });
+    try {
+      overlayPreferences = createOverlayPreferences(path.join(app.getPath("userData"), "preferences.json"));
+    } catch (error) {
+      status.error = "Could not load capture visibility: " + error.message;
+      // Keep the previous hidden default, while allowing a later save to recover.
+      overlayPreferences = { get: () => true, set(value) {
+        const recovered = createOverlayPreferences(path.join(app.getPath("userData"), "preferences.json"));
+        recovered.set(value);
+        overlayPreferences = recovered;
+      } };
+    }
+    computerUseOverlay = createComputerUseOverlay({ BrowserWindow, screen, globalShortcut, onCancel: cancelComputerUse, hideFromCapture: overlayPreferences.get() });
     registerIpc();
     createWindow();
     tray = new Tray(trayImage());

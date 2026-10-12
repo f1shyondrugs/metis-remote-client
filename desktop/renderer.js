@@ -32,12 +32,35 @@ function setConnection(data) {
   byId("device-status").textContent = state.connection.charAt(0).toUpperCase() + state.connection.slice(1);
   byId("device-status").className = `device-state ${state.connection}`;
   byId("update-label").textContent = data.update || "";
+  if (typeof data.hideOverlayFromCapture === "boolean") renderCaptureSetting(data.hideOverlayFromCapture);
   if (data.error && state.paired) showHubError(data.error);
   if (data.error && !state.paired) {
     byId("pair-error").textContent = data.error;
     byId("pair-error").hidden = false;
   }
 }
+
+function renderCaptureSetting(hidden) {
+  state.hideOverlayFromCapture = hidden;
+  byId("hide-overlay-from-capture").checked = hidden;
+  byId("capture-status").textContent = hidden ? "Hidden from supported screen captures" : "Visible in screen streams and recordings";
+}
+
+byId("hide-overlay-from-capture").addEventListener("change", async (event) => {
+  const input = event.target;
+  const previous = state.hideOverlayFromCapture ?? true;
+  input.disabled = true;
+  byId("capture-error").hidden = true;
+  try {
+    renderCaptureSetting(await window.metis.setOverlayCaptureHidden(input.checked));
+  } catch (error) {
+    renderCaptureSetting(previous);
+    byId("capture-error").textContent = error.message || "Could not save capture visibility";
+    byId("capture-error").hidden = false;
+  } finally {
+    input.disabled = false;
+  }
+});
 
 function showHubError(message) {
   const element = byId("hub-error");
