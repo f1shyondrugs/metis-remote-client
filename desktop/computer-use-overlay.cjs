@@ -19,7 +19,7 @@ const OVERLAY_HTML = `<!doctype html>
 
 const IDLE_MS = 45_000;
 
-function createComputerUseOverlay({ BrowserWindow, screen, globalShortcut, onCancel }) {
+function createComputerUseOverlay({ BrowserWindow, screen, globalShortcut, onCancel, hideFromCapture = true }) {
   const windows = new Map();
   let active = false;
   let suspended = false;
@@ -55,7 +55,7 @@ function createComputerUseOverlay({ BrowserWindow, screen, globalShortcut, onCan
     });
     overlay.setAlwaysOnTop(true, "screen-saver");
     overlay.setIgnoreMouseEvents(true, { forward: true });
-    overlay.setContentProtection(true);
+    overlay.setContentProtection(hideFromCapture);
     overlay.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(OVERLAY_HTML)}`);
     overlay.webContents.on("did-finish-load", () => {
       if (active && !suspended && !overlay.isDestroyed()) {
@@ -150,6 +150,14 @@ function createComputerUseOverlay({ BrowserWindow, screen, globalShortcut, onCan
     sync();
   }
 
+  function setHideFromCapture(value) {
+    if (typeof value !== "boolean") throw new TypeError("Capture visibility must be a boolean");
+    hideFromCapture = value;
+    for (const overlay of windows.values()) {
+      if (!overlay.isDestroyed()) overlay.setContentProtection(value);
+    }
+  }
+
   function suspendCapture() {
     if (!active) return;
     suspended = true;
@@ -174,7 +182,7 @@ function createComputerUseOverlay({ BrowserWindow, screen, globalShortcut, onCan
   screen.on("display-removed", sync);
   screen.on("display-metrics-changed", sync);
 
-  return { touch, hide, suspendCapture, resumeCapture, suppressInjectedEscape, updateCursor, hideCursor };
+  return { touch, hide, setHideFromCapture, suspendCapture, resumeCapture, suppressInjectedEscape, updateCursor, hideCursor };
 }
 
 module.exports = { createComputerUseOverlay };

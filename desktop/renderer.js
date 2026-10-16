@@ -32,12 +32,35 @@ function setConnection(data) {
   byId("device-status").textContent = state.connection.charAt(0).toUpperCase() + state.connection.slice(1);
   byId("device-status").className = `device-state ${state.connection}`;
   byId("update-label").textContent = data.update || "";
+  if (typeof data.hideOverlayFromCapture === "boolean") renderCaptureSetting(data.hideOverlayFromCapture);
   if (data.error && state.paired) showHubError(data.error);
   if (data.error && !state.paired) {
     byId("pair-error").textContent = data.error;
     byId("pair-error").hidden = false;
   }
 }
+
+function renderCaptureSetting(hidden) {
+  state.hideOverlayFromCapture = hidden;
+  byId("hide-overlay-from-capture").checked = hidden;
+  byId("capture-status").textContent = hidden ? "Hidden from supported screen captures" : "Visible in screen streams and recordings";
+}
+
+byId("hide-overlay-from-capture").addEventListener("change", async (event) => {
+  const input = event.target;
+  const previous = state.hideOverlayFromCapture ?? true;
+  input.disabled = true;
+  byId("capture-error").hidden = true;
+  try {
+    renderCaptureSetting(await window.metis.setOverlayCaptureHidden(input.checked));
+  } catch (error) {
+    renderCaptureSetting(previous);
+    byId("capture-error").textContent = error.message || "Could not save capture visibility";
+    byId("capture-error").hidden = false;
+  } finally {
+    input.disabled = false;
+  }
+});
 
 function showHubError(message) {
   const element = byId("hub-error");
@@ -61,7 +84,7 @@ function renderCommands() {
   byId("commands-loading").hidden = true;
   const items = filteredAudit();
   if (!items.length) {
-    list.append(node("p", "empty", state.audit.length ? "No commands match these filters." : "No commands have run on this PC yet."));
+    list.append(node("p", "empty", state.audit.length ? "No commands match these filters." : "No commands have run on this device yet."));
     byId("command-detail").hidden = true;
     return;
   }
@@ -110,7 +133,7 @@ function selectLog(id) {
   if (entry.error) detailField(detail, "Error", entry.error);
   if (entry.requestData && Object.keys(entry.requestData).length) detailField(detail, "Request", entry.requestData);
   if (entry.resultData && Object.keys(entry.resultData).length) detailField(detail, "Result", entry.resultData);
-  if (entry.status === "unknown") detailField(detail, "Outcome", "The connection ended before Metis AI received a result. The command may have run. Check this PC before retrying.");
+  if (entry.status === "unknown") detailField(detail, "Outcome", "The connection ended before Metis AI received a result. The command may have run. Check this device before retrying.");
 }
 
 function desktopPermissionCopy(status) {
@@ -182,9 +205,9 @@ async function refresh() {
     state.audit = Array.isArray(data.audit) ? data.audit.filter((entry) => entry.clientId === state.clientId) : [];
     state.loaded = true;
     showHubError("");
-    byId("device-name").textContent = state.client?.name || state.client?.hostname || "This Windows PC";
+    byId("device-name").textContent = state.client?.name || state.client?.hostname || "This device";
     const access = state.client?.permissionMode === "admin" ? "Administrator access" : state.client?.permissionMode === "user" ? "User access" : "Access mode unavailable";
-    byId("device-meta").textContent = [state.client?.os || "Windows", state.client?.version ? `v${state.client.version}` : null, access].filter(Boolean).join(" · ");
+    byId("device-meta").textContent = [state.client?.os || "", state.client?.version ? `v${state.client.version}` : null, access].filter(Boolean).join(" · ");
     byId("device-seen").textContent = state.client?.lastSeenAt ? `Last seen ${formatDate(state.client.lastSeenAt)}` : "";
     byId("sync-label").textContent = `Updated ${new Date().toLocaleTimeString()}`;
     void refreshDesktopPermissions();
@@ -267,3 +290,16 @@ byId("unpair").addEventListener("click", async () => {
 });
 setInterval(() => void refresh(), 5_000);
 void initialize();
+
+byId("desktop-access-permissions").addEventListener("click", async () => {
+  try { const next = await window.metis.desktopAccess(); renderDesktopPermission(next); }
+  catch (error) { byId("desktop-permission-reason").textContent = error.message; }
+});
+function renderDesktopPermission(next) {
+  byId("desktop-permission-notice").hidden = Boolean(next.desktopAvailable);
+  byId("desktop-permission-reason").textContent = next.desktopReason || "Desktop control is unavailable. File and command access remain available.";
+  byId("desktop-access-permissions").hidden = next.platform !== "darwin";
+  byId("pair-note").textContent = next.platform === "win32" ? "The code expires after 15 minutes. For admin access, start this app as administrator and confirm UAC." : "The code expires after 15 minutes. System actions require the permissions of your signed-in account.";
+}
+window.metis.state().then(renderDesktopPermission).catch(() => {});
+window.metis.onStatus(renderDesktopPermission);

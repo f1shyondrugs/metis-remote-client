@@ -1,8 +1,10 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { app, BrowserWindow, Menu, Tray, nativeImage, ipcMain, shell, safeStorage, Notification, dialog, screen, globalShortcut, systemPreferences, desktopCapturer } = require("electron");
 const { createComputerUseOverlay } = require("./computer-use-overlay.cjs");
+const { getDesktopAutostart, setDesktopAutostart } = require("./platform.cjs");
 const { autoUpdater } = require("electron-updater");
 const { createCredentialStore } = require("./credential-store.cjs");
+const { createOverlayPreferences } = require("./overlay-preferences.cjs");
 const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
@@ -28,19 +30,14 @@ function isElevated() {
 }
 
 function getAutostart() {
-  if (process.platform === "darwin") return app.getLoginItemSettings().openAtLogin;
-  if (process.platform !== "win32") return false;
+  if (process.platform !== "win32") return getDesktopAutostart(app);
   try {
     return runPowerShell(`$task = Get-ScheduledTask -TaskName ${psQuote(AUTOSTART_TASK)} -ErrorAction SilentlyContinue; [bool]$task`) === "True";
   } catch { return false; }
 }
 
 function setAutostart(enabled) {
-  if (process.platform === "darwin") {
-    app.setLoginItemSettings({ openAtLogin: Boolean(enabled) });
-    return app.getLoginItemSettings().openAtLogin;
-  }
-  if (process.platform !== "win32") return false;
+  if (process.platform !== "win32") return setDesktopAutostart(app, enabled);
   const taskName = psQuote(AUTOSTART_TASK);
   if (enabled) {
     const runLevel = config?.permissionMode === "admin" ? "Highest" : "Limited";
@@ -57,11 +54,27 @@ let window;
 let tray;
 let runtime;
 let computerUseOverlay;
+let overlayPreferences;
 let computerUseCursorTimer;
 let config;
 let quitting = false;
 let previousConnection = "offline";
-const status = { connection: "offline", error: "", update: "" };
+const status = { connection: "offline", error: "", update: "", desktopAvailable: false, desktopReason: "Checking desktop permissions…", platform: process.platform };
+let desktopProbeTimer;
+async function probeDesktop() {
+  try {
+    if (process.platform === "win32") {
+      status.desktopAvailable = screen.getAllDisplays().length > 0;
+      status.desktopReason = status.desktopAvailable ? "" : "No interactive display";
+    } else {
+      const { unixComputerUse } = await import(pathToFileURL(path.join(__dirname, "computer-use-unix.mjs")).href);
+      const result = await unixComputerUse({ operation: "status" });
+      status.desktopAvailable = Boolean(result.available);
+      status.desktopReason = result.reason || "";
+    }
+  } catch (error) { status.desktopAvailable = false; status.desktopReason = error.stderr?.trim() || error.message; }
+  broadcast();
+}
 
 function configPath() {
   return path.join(app.getPath("userData"), "config.json");
@@ -71,6 +84,20 @@ const credentialStore = createCredentialStore({ file: configPath(), safeStorage 
 function loadConfig() { return credentialStore.load(); }
 function saveConfig(next) { credentialStore.save(next); }
 
+function setOverlayCaptureHidden(value) {
+  if (typeof value !== "boolean") throw new TypeError("Capture visibility must be a boolean");
+  const previous = overlayPreferences.get();
+  try {
+    computerUseOverlay.setHideFromCapture(value);
+    overlayPreferences.set(value);
+  } catch (error) {
+    computerUseOverlay.setHideFromCapture(previous);
+    throw error;
+  }
+  broadcast();
+  return value;
+}
+
 function publicState() {
   return {
     paired: Boolean(config),
@@ -78,6 +105,7 @@ function publicState() {
     clientId: config?.clientId || "",
     permissionMode: config?.permissionMode || null,
     platform: process.platform,
+    hideOverlayFromCapture: overlayPreferences?.get() ?? true,
     ...status,
   };
 }
@@ -186,7 +214,7 @@ function createWindow() {
     minWidth: 390,
     minHeight: 560,
     title: APP_NAME,
-    icon: path.join(__dirname, "assets", "icon.ico"),
+    icon: path.join(__dirname, "assets", process.platform === "win32" ? "icon.ico" : "icon.png"),
     show: false,
     autoHideMenuBar: true,
     backgroundColor: "#fafafa",
@@ -236,7 +264,7 @@ async function startRuntime() {
   runtime = clientModule.startRemoteClient({
     config,
     configPath: configPath(),
-    desktopGuiAvailable: () => ["win32", "darwin", "linux"].includes(process.platform) && screen.getAllDisplays().length > 0,
+    desktopGuiAvailable: () => status.desktopAvailable,
     nativeNotificationsAvailable: () => screen.getAllDisplays().length > 0 && Notification.isSupported(),
     showNotification: notification => showNativeNotification({ Notification, openExternal: url => shell.openExternal(url), server: config.server, notification }),
     onEvent(event) {
@@ -302,7 +330,7 @@ function registerIpc() {
         token,
         name: os.hostname(),
         hostname: os.hostname(),
-        os: process.platform === "darwin" ? "macos" : process.platform === "linux" ? "linux" : `windows ${os.release()}`,
+        os: `${process.platform === "darwin" ? "macos" : process.platform === "win32" ? "windows" : "linux"} ${os.release()}`,
         architecture: os.arch(),
         version: app.getVersion(),
         permissionMode,
@@ -310,7 +338,7 @@ function registerIpc() {
           ...(permissionMode === "admin"
             ? ["user_files", "user_processes", "user_directories", "system_files", "services", "disks", "admin_processes"]
             : ["user_files", "user_processes", "user_directories"]),
-          ...(screen.getAllDisplays().length > 0 ? ["desktop_gui"] : []),
+          ...(status.desktopAvailable ? ["desktop_gui"] : []),
         ],
       }),
       signal: AbortSignal.timeout(15_000),
@@ -352,11 +380,21 @@ function registerIpc() {
     fs.writeFileSync(result.filePath, JSON.stringify({ exportedAt: new Date().toISOString(), audit: snapshot.audit }, null, 2), "utf8");
     return true;
   });
+  ipcMain.handle("hub:set-overlay-capture-hidden", (_event, value) => setOverlayCaptureHidden(value));
   ipcMain.handle("hub:get-autostart", () => getAutostart());
   ipcMain.handle("hub:set-autostart", (_event, value) => {
     const enabled = setAutostart(Boolean(value));
     updateTray();
     return enabled;
+  });
+  ipcMain.handle("hub:desktop-access", async () => {
+    if (process.platform === "darwin") {
+      systemPreferences.isTrustedAccessibilityClient(true);
+      await desktopCapturer.getSources({ types: ["screen"] });
+      await shell.openExternal("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility");
+    }
+    await probeDesktop();
+    return publicState();
   });
   ipcMain.handle("hub:check-updates", async () => {
     if (!app.isPackaged) return "Updates are available in installed builds";
@@ -435,7 +473,21 @@ if (!app.requestSingleInstanceLock()) {
       app.setLoginItemSettings({ openAtLogin: false, path: process.execPath });
       try { setAutostart(true); } catch (error) { status.error = error.message; }
     }
-    computerUseOverlay = createComputerUseOverlay({ BrowserWindow, screen, globalShortcut, onCancel: cancelComputerUse });
+    try {
+      overlayPreferences = createOverlayPreferences(path.join(app.getPath("userData"), "preferences.json"));
+    } catch (error) {
+      status.error = "Could not load capture visibility: " + error.message;
+      // Keep the previous hidden default, while allowing a later save to recover.
+      overlayPreferences = { get: () => true, set(value) {
+        const recovered = createOverlayPreferences(path.join(app.getPath("userData"), "preferences.json"));
+        recovered.set(value);
+        overlayPreferences = recovered;
+      } };
+    }
+    computerUseOverlay = createComputerUseOverlay({ BrowserWindow, screen, globalShortcut, onCancel: cancelComputerUse, hideFromCapture: overlayPreferences.get() });
+    await probeDesktop();
+    desktopProbeTimer = setInterval(() => { probeDesktop().catch(() => {}); }, 20_000);
+    desktopProbeTimer.unref?.();
     registerIpc();
     createWindow();
     tray = new Tray(trayImage());

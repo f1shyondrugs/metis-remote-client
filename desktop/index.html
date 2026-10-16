@@ -20,17 +20,18 @@
     <button id="banner-grant" class="permission-grant" type="button" hidden>Grant</button>
   </div>
   <main>
+    <div id="desktop-permission-notice" class="device-summary" role="status" hidden><span id="desktop-permission-reason"></span><button id="desktop-access-permissions" class="text-button" type="button" hidden>Open macOS permissions</button></div>
     <section id="pair-view" class="pair-view">
       <div class="pair-panel">
         <p class="eyebrow">THIS DEVICE</p>
-        <h1>Connect this Windows device</h1>
+        <h1>Connect this device</h1>
         <p class="subtle">Open Settings → Devices → Add client in Metis AI and enter the pairing code here.</p>
         <form id="pair-form">
           <label for="server">Metis AI server URL</label>
           <input id="server" type="url" placeholder="https://your-metis-server.example" required autocomplete="url">
           <label for="token">Pairing code</label>
           <input id="token" type="text" placeholder="Paste the code from Metis AI" required autocomplete="off" spellcheck="false">
-          <p class="field-note">The code expires after 15 minutes. For admin access, start this app as administrator and confirm UAC.</p>
+          <p id="pair-note" class="field-note">The code expires after 15 minutes.</p>
           <button id="pair-button" class="primary-button" type="submit">Connect device</button>
         </form>
         <p id="pair-error" class="error-text" role="alert" hidden></p>
@@ -38,13 +39,13 @@
     </section>
     <section id="hub-view" class="hub-view" hidden>
       <div class="page-heading">
-        <div><p class="eyebrow">THIS DEVICE</p><h1 id="device-name">Your Windows PC</h1><p id="sync-label" class="subtle">Loading activity…</p></div>
+        <div><p class="eyebrow">THIS DEVICE</p><h1 id="device-name">Your device</h1><p id="sync-label" class="subtle">Loading activity…</p></div>
         <div class="heading-actions">
           <button id="refresh" class="text-button" type="button">Refresh</button>
           <details id="more-menu" class="more-menu">
             <summary aria-label="More device options" title="More device options">⋯</summary>
             <div class="menu-panel">
-              <label class="menu-item check"><input id="autostart" type="checkbox"> Start at Windows login</label>
+              <label class="menu-item check"><input id="autostart" type="checkbox"> Start at login</label>
               <button id="check-updates" class="menu-item" type="button">Check for updates</button>
               <button id="unpair" class="menu-item destructive" type="button">Disconnect this device</button>
             </div>
@@ -52,8 +53,16 @@
         </div>
       </div>
       <div id="hub-error" class="error-banner" role="alert" hidden></div>
-      <div class="device-summary status-summary"><span id="device-status" class="device-state">Offline</span><span id="device-meta">Windows device</span><span id="device-seen"></span></div>
+      <div class="device-summary status-summary"><span id="device-status" class="device-state">Offline</span><span id="device-meta">Device</span><span id="device-seen"></span></div>
       <div class="device-summary"><strong>Computer Use</strong><span class="subtle">Managed in Metis AI → Settings → Devices.</span></div>
+      <div class="device-summary capture-setting">
+        <div class="capture-copy">
+          <label class="menu-item check" for="hide-overlay-from-capture"><input id="hide-overlay-from-capture" type="checkbox" checked aria-describedby="capture-help capture-status"> Hide Computer Use overlay from streams and recordings</label>
+          <p id="capture-help" class="subtle">The notice, border and cursor stay visible locally during Computer Use. To include them in a stream, share your entire screen.</p>
+          <p id="capture-status" class="subtle" role="status">Hidden from screen captures</p>
+          <p id="capture-error" class="error-text" role="alert" hidden></p>
+        </div>
+      </div>
       <div id="desktop-permissions" class="device-summary permissions-card" hidden>
         <div>
           <strong id="desktop-permissions-title">Desktop permissions</strong>
@@ -65,7 +74,7 @@
         </div>
       </div>
       <section class="activity-pane" aria-label="This device's activity">
-        <div class="section-heading"><div><h2>Command history</h2><p class="subtle">Activity on this PC only</p></div><button id="export" class="text-button" type="button">Export logs</button></div>
+        <div class="section-heading"><div><h2>Command history</h2><p class="subtle">Activity on this device only</p></div><button id="export" class="text-button" type="button">Export logs</button></div>
         <div class="filters"><input id="search" type="search" placeholder="Search commands" aria-label="Search commands"><select id="status-filter" aria-label="Filter by status"><option value="all">All statuses</option><option value="running">Running</option><option value="completed">Completed</option><option value="error">Failed</option><option value="unknown">Unclear outcome</option><option value="denied">Denied</option></select></div>
         <div id="commands-loading" class="empty">Loading command history…</div>
         <div id="commands-list" class="commands-list"></div>

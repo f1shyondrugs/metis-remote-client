@@ -1,6 +1,6 @@
 {
   "name": "metis-ai-remote-client",
-  "version": "1.4.8",
+  "version": "1.4.9",
   "private": true,
   "description": "Metis AI Remote Client Hub",
   "main": "main.cjs",
@@ -12,7 +12,8 @@
     "build:win": "npm run prepare:client && electron-builder --win nsis --x64",
     "build:mac": "npm run prepare:client && electron-builder --mac dmg --arm64",
     "build:linux": "npm run prepare:client && electron-builder --linux AppImage --x64",
-    "build:dir": "npm run prepare:client && electron-builder --dir"
+    "build:dir": "npm run prepare:client && electron-builder --dir",
+    "test": "node --test ../tests/*.test.mjs"
   },
   "dependencies": {
     "electron-updater": "^6.6.2",
@@ -27,6 +28,7 @@
     "appId": "ai.metis.remoteclient",
     "productName": "Metis AI Remote Client",
     "asar": true,
+    "afterPack": "build/linux-after-pack.cjs",
     "asarUnpack": [
       "computer-use-worker.mjs",
       "computer-use.mjs",
@@ -45,12 +47,14 @@
       "computer-use-worker.mjs",
       "computer-use-unix.mjs",
       "computer-use-overlay.cjs",
+      "overlay-preferences.cjs",
       "libmetisdesktop.dylib",
       "assets/icon.ico",
       "assets/icon.png",
       "node_modules/**/*",
       "package.json",
       "credential-store.cjs",
+      "platform.cjs",
       "notification-client.mjs",
       "notification-native.cjs"
     ],

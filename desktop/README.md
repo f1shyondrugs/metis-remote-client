@@ -32,6 +32,30 @@ The output is `dist/Metis-AI-Remote-Client-Setup.exe`. A matching version tag bu
 
 Download the app from this repository's latest GitHub Release. Packaged clients check this public repository for `latest.yml` and download new EXE releases directly, including before pairing. The app does not send its Metis pairing credential to GitHub. Existing clients from version 1.3.4 still update through their paired Metis server until they install this release.
 
+## Linux AppImage
+
+The Linux AppImage requires an interactive X11 or Wayland desktop. Its
+packaged AppRun entrypoint performs the preflight before starting Electron: it
+refuses headless/root startup, checks that `ldd` is available, reports missing
+Ubuntu runtime libraries with a concrete `apt-get` command, and never starts
+the Electron ELF after a failed check. The same check is available for a
+downloaded AppImage:
+
+~~~bash
+bash desktop/linux-launcher.sh ./Metis-AI-Remote-Client-x86_64.AppImage
+~~~
+
+The external preflight extracts the AppImage into a temporary directory, runs
+`ldd`, and reports all missing host libraries together. It does not install
+packages or use the Electron no-sandbox flag. On a headless Ubuntu machine,
+use the generated Linux remote-client installer command from Metis Remote
+Devices; that supported headless client downloads `/install/remote-client.sh`.
+
+For a server without `DISPLAY` or `WAYLAND_DISPLAY`, use the legacy headless
+remote-client installer provided by the paired Metis server. That installer is
+not part of this desktop-client repository; the AppImage cannot provide
+headless operation.
+
 ## Runtime
 
 - This PC's identity and command history come from the authenticated Metis hub API. The API only returns records for the requesting client.
@@ -45,3 +69,9 @@ Download the app from this repository's latest GitHub Release. Packaged clients 
 Linux pairing works without GNOME Keyring or KWallet, including CachyOS/Hyprland. When a real OS keyring is available, the app encrypts the credential as before. Otherwise it stores the credential unencrypted in the user-only `config.json` under the app-data directory (`MetisAI/RemoteClient`): directory permissions 0700, file permissions 0600. It migrates this file to keyring encryption when a keyring becomes available. Windows and macOS retain OS encryption.
 
 An existing encrypted pairing still needs its original unlocked keyring; if that keyring is lost, pair the device again. Pairing and terminal/file access do not require X11. Linux Computer Use continues to require X11; Wayland desktop control is not supported.
+
+## Stream and recording visibility
+
+In the Device Hub, under Computer Use, toggle **Hide Computer Use overlay from streams and recordings**. Enabled preserves the existing capture exclusion; disabled allows screen streams to show the notice, border and Metis cursor. It applies immediately across all displays and survives restarts and re-pairing. The overlay remains visible locally in either mode. Metis still temporarily hides its own overlay while observing the desktop.
+
+This uses Electron content protection. Support depends on the OS and capture application (Linux may ignore protection; macOS ScreenCaptureKit can capture protected windows). Single-window/game sharing typically does not include a separate overlay even when hiding is disabled; use entire-screen sharing to include it.
