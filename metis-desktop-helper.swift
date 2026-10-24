@@ -96,8 +96,14 @@ func handle(_ p: [String: Any]) throws -> [String: Any] {
             guard (expected[key] as? Int) == (current[key] as? Int) else { try fail("Window moved or resized. Observe this window again before acting") }
         }
     }
+    let screen = displayBounds(containing: r)
+    if let expected = p["expectedDisplay"] as? [String: Any] {
+        let current = ["x": Int(screen.minX), "y": Int(screen.minY), "width": Int(screen.width), "height": Int(screen.height)]
+        for key in ["x", "y", "width", "height"] {
+            guard (expected[key] as? Int) == current[key] else { try fail("Display geometry changed. Observe this window again before acting") }
+        }
+    }
     func point(_ xKey: String, _ yKey: String) throws -> CGPoint {
-        let screen = displayBounds(containing: r)
         guard let x = p[xKey] as? Int, let y = p[yKey] as? Int,
               x >= 0 && y >= 0 && x < Int(screen.width) && y < Int(screen.height) else { try fail("Coordinates are outside the target window") }
         return CGPoint(x: screen.minX + CGFloat(x), y: screen.minY + CGFloat(y))

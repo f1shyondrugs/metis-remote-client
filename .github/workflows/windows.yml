@@ -49,6 +49,7 @@ jobs:
           path: |
             desktop/dist/*.exe
             desktop/dist/*.dmg
+            desktop/dist/*.zip
             desktop/dist/*.AppImage
             desktop/dist/*.yml
             desktop/dist/*.blockmap

@@ -185,7 +185,7 @@ function finiteInt(value, label, min = -100000, max = 100000) {
   return number;
 }
 
-export async function computerUse(params = {}, { signal } = {}) {
+export async function computerUse(params = {}, { signal, platform = process.platform, runUnix = unixComputerUse } = {}) {
   const operation = String(params.operation || "");
   const allowed = ["status", "list_windows", "observe", "move", "click", "scroll", "drag", "type", "key", "request_permissions"];
   if (!allowed.includes(operation)) throw new Error("Unsupported computer use operation");
@@ -202,6 +202,8 @@ export async function computerUse(params = {}, { signal } = {}) {
     }
     payload.expectedGeometry = observation.geometry;
     payload.coordinateScale = observation.scale;
+    payload.expectedDisplay = observation.display;
+    payload.screenshotBounds = observation.screenshotBounds;
     observations.delete(String(params.observationId));
   }
   if (["move", "click", "scroll", "drag"].includes(operation)) {
@@ -226,12 +228,18 @@ export async function computerUse(params = {}, { signal } = {}) {
     payload.key = params.key;
   }
   if (payload.coordinateScale) {
+    // Validate pixels before scaling: rounding must not admit a point outside the image.
+    for (const [key, bound] of [["x", "width"], ["toX", "width"], ["y", "height"], ["toY", "height"]]) {
+      if (key in payload && payload[key] >= payload.screenshotBounds[bound]) {
+        throw new Error("Coordinates are outside the observed screenshot");
+      }
+    }
     for (const key of ["x", "toX"]) if (key in payload) payload[key] = Math.floor(payload[key] * payload.coordinateScale.x);
     for (const key of ["y", "toY"]) if (key in payload) payload[key] = Math.floor(payload[key] * payload.coordinateScale.y);
   }
   let result;
-  if (process.platform !== "win32") {
-    result = await unixComputerUse(payload, { signal });
+  if (platform !== "win32") {
+    result = await runUnix(payload, { signal });
   } else {
   const encoded = Buffer.from(JSON.stringify(payload)).toString("base64");
   const command = Buffer.from(SCRIPT.replace("$args[0]", `'${encoded}'`), "utf16le").toString("base64");
@@ -253,15 +261,28 @@ export async function computerUse(params = {}, { signal } = {}) {
   result = JSON.parse(stdout.trim());
   }
   if (operation === "observe") {
+    const coordinateWidth = result.coordinateWidth ?? result.width;
+    const coordinateHeight = result.coordinateHeight ?? result.height;
+    if (![result.width, result.height, coordinateWidth, coordinateHeight].every(value => Number.isInteger(value) && value > 0)) {
+      throw new Error("Invalid screenshot dimensions");
+    }
+    const wholeDisplay = platform === "darwin" && result.windowX !== undefined;
     const observationId = randomUUID();
     observations.clear();
     observations.set(observationId, { windowId: payload.windowId, at: Date.now(),
-      geometry: process.platform !== "win32" ? { x: result.windowX ?? result.x, y: result.windowY ?? result.y,
+      geometry: platform !== "win32" ? { x: result.windowX ?? result.x, y: result.windowY ?? result.y,
         width: result.windowWidth ?? result.coordinateWidth ?? result.width,
         height: result.windowHeight ?? result.coordinateHeight ?? result.height } : undefined,
-      scale: { x: (result.coordinateWidth ?? result.width) / result.width,
-        y: (result.coordinateHeight ?? result.height) / result.height } });
-    return { ...result, observationId };
+      display: wholeDisplay ? { x: result.x, y: result.y, width: coordinateWidth, height: coordinateHeight } : undefined,
+      screenshotBounds: { width: result.width, height: result.height },
+      scale: { x: coordinateWidth / result.width, y: coordinateHeight / result.height } });
+    return { ...result, observationId, coordinates: {
+      space: "screenshot-pixels", origin: "top-left", width: result.width, height: result.height,
+      capture: wholeDisplay ? "display" : "window",
+      instructions: "Use x/y in pixels of this entire image from its top-left corner. " +
+        (wholeDisplay ? "The image includes the menu bar and Dock; do not subtract their height or the window position. " : "") +
+        "The client applies input scaling automatically; do not scale for Retina or DPI again.",
+    } };
   }
   return result;
 }

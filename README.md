@@ -16,6 +16,12 @@ Windows releases include `latest.yml` for automatic updates. The app checks this
 
 The pairing code expires after 15 minutes. See [desktop/README.md](desktop/README.md) for permissions and Computer Use details.
 
+## Screenshot coordinates
+
+Every Computer Use observation includes a `coordinates` description: use pixels of the returned image from its top-left corner. The macOS desktop client captures the entire selected monitor, including the menu bar and Dock. Window geometry is reported separately. The client applies Retina/DPI scaling once and rejects positions outside the observed image. A changed macOS display layout requires a fresh observation before input.
+
+Version 1.4.10 includes this contract in the client itself, so it is available to agents connected to any Metis installation without installing a separate skill. Existing clients receive it after updating. Windows and Linux keep their window screenshot behavior. macOS releases include the DMG installer and a ZIP archive for the updater.
+
 ## Build and test
 
 On Windows with Node.js 22 or later:
