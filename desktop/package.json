@@ -10,7 +10,7 @@
     "prepare:client": "node prepare-client.cjs",
     "start": "npm run prepare:client && electron .",
     "build:win": "npm run prepare:client && electron-builder --win nsis --x64",
-    "build:mac": "npm run prepare:client && electron-builder --mac dmg --arm64",
+    "build:mac": "npm run prepare:client && electron-builder --mac --arm64",
     "build:linux": "npm run prepare:client && electron-builder --linux AppImage --x64",
     "build:dir": "npm run prepare:client && electron-builder --dir",
     "test": "node --test ../tests/*.test.mjs"
