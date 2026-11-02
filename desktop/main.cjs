@@ -8,44 +8,88 @@ const { createOverlayPreferences } = require("./overlay-preferences.cjs");
 const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
-const { spawnSync } = require("node:child_process");
+const { execFile } = require("node:child_process");
+const { Worker } = require("node:worker_threads");
 const { pathToFileURL } = require("node:url");
 
 const APP_NAME = "Metis AI Remote Client";
 const AUTOSTART_TASK = "Metis AI Remote Client";
+let autostartEnabled = false;
+let autostartLookup;
+let autostartRevision = 0;
+let autostartChange = Promise.resolve();
+let lastTrayKey = "";
 
 function psQuote(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
 
 function runPowerShell(script) {
-  const result = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")], { encoding: "utf8", windowsHide: true, timeout: 15000 });
-  if (result.error || result.status !== 0) throw new Error(result.stderr?.trim() || result.error?.message || "Windows task setting failed");
-  return result.stdout.trim();
+  return new Promise((resolve, reject) => {
+    // Windows process creation can itself take hundreds of milliseconds. Keep
+    // both CreateProcess and command completion outside Electron's UI thread.
+    const worker = new Worker(`
+      const { parentPort, workerData } = require("node:worker_threads");
+      const { execFile } = require("node:child_process");
+      execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", workerData],
+        { encoding: "utf8", windowsHide: true, timeout: 15000, maxBuffer: 1024 * 1024 },
+        (error, stdout, stderr) => parentPort.postMessage(error
+          ? { ok: false, error: stderr?.trim() || error.message || "Windows task setting failed" }
+          : { ok: true, stdout: stdout.trim() }));
+    `, { eval: true, workerData: Buffer.from(script, "utf16le").toString("base64") });
+    let settled = false;
+    worker.once("message", result => {
+      settled = true;
+      if (result.ok) resolve(result.stdout);
+      else reject(new Error(result.error));
+      void worker.terminate();
+    });
+    worker.once("error", error => { settled = true; reject(error); });
+    worker.once("exit", code => { if (!settled) reject(new Error("Windows settings worker exited (" + code + ")")); });
+  });
 }
 
-function isElevated() {
+async function isElevated() {
   if (process.platform !== "win32") return false;
-  return runPowerShell("$identity = [Security.Principal.WindowsIdentity]::GetCurrent(); $principal = [Security.Principal.WindowsPrincipal]::new($identity); $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)") === "True";
+  return await runPowerShell("$identity = [Security.Principal.WindowsIdentity]::GetCurrent(); $principal = [Security.Principal.WindowsPrincipal]::new($identity); $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)") === "True";
 }
 
 function getAutostart() {
-  if (process.platform !== "win32") return getDesktopAutostart(app);
-  try {
-    return runPowerShell(`$task = Get-ScheduledTask -TaskName ${psQuote(AUTOSTART_TASK)} -ErrorAction SilentlyContinue; [bool]$task`) === "True";
-  } catch { return false; }
+  if (process.platform !== "win32") {
+    autostartEnabled = getDesktopAutostart(app);
+    return Promise.resolve(autostartEnabled);
+  }
+  if (autostartLookup) return autostartLookup;
+  const revision = autostartRevision;
+  autostartLookup = runPowerShell(`$task = Get-ScheduledTask -TaskName ${psQuote(AUTOSTART_TASK)} -ErrorAction SilentlyContinue; [bool]$task`)
+    .then(value => { if (revision === autostartRevision) autostartEnabled = value === "True"; updateTray(); return autostartEnabled; })
+    .catch(() => autostartEnabled)
+    .finally(() => { autostartLookup = undefined; });
+  return autostartLookup;
 }
 
 function setAutostart(enabled) {
-  if (process.platform !== "win32") return setDesktopAutostart(app, enabled);
+  const revision = ++autostartRevision;
+  const operation = autostartChange.catch(() => {}).then(async () => {
+  if (process.platform !== "win32") {
+    const value = await setDesktopAutostart(app, enabled);
+    if (revision === autostartRevision) autostartEnabled = value;
+    updateTray();
+    return value;
+  }
   const taskName = psQuote(AUTOSTART_TASK);
   if (enabled) {
     const runLevel = config?.permissionMode === "admin" ? "Highest" : "Limited";
-    runPowerShell(`$user = [Security.Principal.WindowsIdentity]::GetCurrent().Name; $action = New-ScheduledTaskAction -Execute ${psQuote(process.execPath)}; $trigger = New-ScheduledTaskTrigger -AtLogon -User $user; $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel ${runLevel}; Register-ScheduledTask -TaskName ${taskName} -Action $action -Trigger $trigger -Principal $principal -Force | Out-Null`);
+    await runPowerShell(`$user = [Security.Principal.WindowsIdentity]::GetCurrent().Name; $action = New-ScheduledTaskAction -Execute ${psQuote(process.execPath)}; $trigger = New-ScheduledTaskTrigger -AtLogon -User $user; $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel ${runLevel}; Register-ScheduledTask -TaskName ${taskName} -Action $action -Trigger $trigger -Principal $principal -Force | Out-Null`);
   } else {
-    runPowerShell(`Unregister-ScheduledTask -TaskName ${taskName} -Confirm:$false -ErrorAction SilentlyContinue`);
+    await runPowerShell(`Unregister-ScheduledTask -TaskName ${taskName} -Confirm:$false -ErrorAction SilentlyContinue`);
   }
-  return getAutostart();
+  if (revision === autostartRevision) autostartEnabled = enabled;
+  updateTray();
+  return enabled;
+  });
+  autostartChange = operation;
+  return operation;
 }
 const userDataDir = path.join(app.getPath("appData"), "MetisAI", "RemoteClient");
 fs.mkdirSync(userDataDir, { recursive: true });
@@ -110,13 +154,13 @@ function publicState() {
   };
 }
 
-function openMacPrivacySettings() {
+async function openMacPrivacySettings() {
   if (process.platform !== "darwin") return;
   for (const url of [
     "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
     "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
   ]) {
-    spawnSync("open", [url], { timeout: 8000 });
+    await new Promise((resolve, reject) => execFile("open", [url], { timeout: 8000 }, error => error ? reject(error) : resolve()));
   }
 }
 
@@ -125,7 +169,7 @@ async function promptMacDesktopPermissions() {
   try {
     await desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width: 1, height: 1 } });
   } catch { /* first Screen Recording prompt, or already denied */ }
-  openMacPrivacySettings();
+  await openMacPrivacySettings();
 }
 
 async function desktopPermissionStatus(prompt = false) {
@@ -189,12 +233,15 @@ function trayImage() {
 
 function updateTray() {
   if (!tray) return;
+  const key = JSON.stringify([status.connection, Boolean(config), autostartEnabled]);
+  if (key === lastTrayKey) return;
+  lastTrayKey = key;
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: "Open Device Hub", click: () => showWindow() },
     { label: `Connection: ${status.connection}`, enabled: false },
     { type: "separator" },
-    { label: "Start at login", type: "checkbox", checked: getAutostart(),
-      click: (item) => { try { setAutostart(item.checked); } catch (error) { status.error = error.message; broadcast(); } } },
+    { label: "Start at login", type: "checkbox", checked: autostartEnabled,
+      click: async (item) => { try { await setAutostart(item.checked); } catch (error) { lastTrayKey = ""; status.error = error.message; broadcast(); } } },
     { label: "Open Metis AI", enabled: Boolean(config), click: () => config && shell.openExternal(config.server) },
     { type: "separator" },
     { label: "Quit", click: () => { quitting = true; app.quit(); } },
@@ -279,7 +326,11 @@ async function startRuntime() {
         return;
       }
       if (event.type !== "connection") return;
-      if (event.status !== "online") computerUseOverlay?.hide();
+      if (event.status !== "online") {
+        clearInterval(computerUseCursorTimer);
+        computerUseCursorTimer = undefined;
+        computerUseOverlay?.hide();
+      }
       previousConnection = status.connection;
       status.connection = event.status;
       status.error = event.error || "";
@@ -382,8 +433,8 @@ function registerIpc() {
   });
   ipcMain.handle("hub:set-overlay-capture-hidden", (_event, value) => setOverlayCaptureHidden(value));
   ipcMain.handle("hub:get-autostart", () => getAutostart());
-  ipcMain.handle("hub:set-autostart", (_event, value) => {
-    const enabled = setAutostart(Boolean(value));
+  ipcMain.handle("hub:set-autostart", async (_event, value) => {
+    const enabled = await setAutostart(Boolean(value));
     updateTray();
     return enabled;
   });
@@ -454,24 +505,24 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(async () => {
     app.setAppUserModelId("ai.metis.remoteclient");
     try { config = loadConfig(); } catch (error) { status.error = error.message; }
-    if (process.platform === "win32" && config?.permissionMode === "admin" && !isElevated()) {
+    if (process.platform === "win32" && config?.permissionMode === "admin" && !(await isElevated())) {
       try {
         app.releaseSingleInstanceLock();
-        runPowerShell(`Start-Process -FilePath ${psQuote(process.execPath)} -Verb RunAs`);
+        await runPowerShell(`Start-Process -FilePath ${psQuote(process.execPath)} -Verb RunAs`);
       } catch (error) {
         dialog.showErrorBox(APP_NAME, error.message || "Administrator access was not confirmed.");
       }
       app.quit();
       return;
     }
-    if (process.platform === "win32" && config?.permissionMode === "user" && isElevated()) {
+    if (process.platform === "win32" && config?.permissionMode === "user" && await isElevated()) {
       dialog.showErrorBox(APP_NAME, "This device was paired with user access. Start the app normally, without administrator rights.");
       app.quit();
       return;
     }
     if (process.platform === "win32" && app.getLoginItemSettings().openAtLogin) {
       app.setLoginItemSettings({ openAtLogin: false, path: process.execPath });
-      try { setAutostart(true); } catch (error) { status.error = error.message; }
+      try { await setAutostart(true); } catch (error) { status.error = error.message; }
     }
     try {
       overlayPreferences = createOverlayPreferences(path.join(app.getPath("userData"), "preferences.json"));
@@ -492,6 +543,7 @@ if (!app.requestSingleInstanceLock()) {
     createWindow();
     tray = new Tray(trayImage());
     updateTray();
+    void getAutostart();
     showWindow();
     if (config) {
       try { await startRuntime(); } catch (error) {

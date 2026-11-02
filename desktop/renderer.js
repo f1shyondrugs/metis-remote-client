@@ -197,7 +197,7 @@ async function refreshDesktopPermissions(prompt = false) {
 }
 
 async function refresh() {
-  if (!state.paired || state.fetching) return;
+  if (!state.paired || state.fetching || document.hidden) return;
   state.fetching = true;
   try {
     const data = await window.metis.snapshot();
@@ -228,20 +228,25 @@ async function initialize() {
     byId("pair-error").hidden = false;
     return;
   }
-  try {
-    setConnection(await window.metis.state());
-    byId("autostart").checked = await window.metis.getAutostart();
-    void refreshDesktopPermissions();
-    if (state.paired) await refresh();
-  } catch (error) {
-    byId("pair-error").textContent = error.message || "Could not initialize the app";
-    byId("pair-error").hidden = false;
-  }
+  // Listen before any slow native/network lookup, so reconnects remain visible.
   window.metis.onStatus((data) => {
     const wasPaired = state.paired;
     setConnection(data);
     if (!wasPaired && state.paired) void refresh();
   });
+  const loginInput = byId("autostart");
+  loginInput.disabled = true;
+  void window.metis.getAutostart().then(value => { loginInput.checked = value; })
+    .catch(error => showHubError(error.message || "Could not read login setting"))
+    .finally(() => { loginInput.disabled = false; });
+  try {
+    setConnection(await window.metis.state());
+    void refreshDesktopPermissions();
+    if (state.paired) void refresh();
+  } catch (error) {
+    byId("pair-error").textContent = error.message || "Could not initialize the app";
+    byId("pair-error").hidden = false;
+  }
 }
 
 byId("pair-form").addEventListener("submit", async (event) => {
@@ -273,8 +278,10 @@ byId("search").addEventListener("input", renderCommands);
 byId("status-filter").addEventListener("change", renderCommands);
 byId("open-server").addEventListener("click", () => void window.metis.openServer());
 byId("autostart").addEventListener("change", async (event) => {
+  event.target.disabled = true;
   try { event.target.checked = await window.metis.setAutostart(event.target.checked); }
   catch (error) { showHubError(error.message || "Could not change login setting"); event.target.checked = !event.target.checked; }
+  finally { event.target.disabled = false; }
 });
 byId("check-updates").addEventListener("click", async () => {
   byId("more-menu").open = false;
@@ -289,6 +296,7 @@ byId("unpair").addEventListener("click", async () => {
   state.loaded = false;
 });
 setInterval(() => void refresh(), 5_000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) void refresh(); });
 void initialize();
 
 byId("desktop-access-permissions").addEventListener("click", async () => {
@@ -301,5 +309,7 @@ function renderDesktopPermission(next) {
   byId("desktop-access-permissions").hidden = next.platform !== "darwin";
   byId("pair-note").textContent = next.platform === "win32" ? "The code expires after 15 minutes. For admin access, start this app as administrator and confirm UAC." : "The code expires after 15 minutes. System actions require the permissions of your signed-in account.";
 }
-window.metis.state().then(renderDesktopPermission).catch(() => {});
-window.metis.onStatus(renderDesktopPermission);
+if (window.metis) {
+  window.metis.state().then(renderDesktopPermission).catch(() => {});
+  window.metis.onStatus(renderDesktopPermission);
+}

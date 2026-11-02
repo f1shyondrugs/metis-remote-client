@@ -29,12 +29,31 @@ function createComputerUseOverlay({ BrowserWindow, screen, globalShortcut, onCan
   let cursorPosition = null;
   let escapeRegistered = false;
   let suppressEscapeUntil = 0;
+  const scriptStates = new WeakMap();
+
+  function runScript(overlay, script) {
+    if (overlay.isDestroyed() || overlay.webContents.isLoading()) return;
+    let state = scriptStates.get(overlay);
+    if (!state) { state = { running: false, latest: null, sent: null }; scriptStates.set(overlay, state); }
+    if (state.running) { state.latest = script; return; }
+    if (state.sent === script) return;
+    state.running = true;
+    state.sent = script;
+    let execution;
+    try { execution = overlay.webContents.executeJavaScript(script); }
+    catch { state.running = false; state.sent = null; return; }
+    Promise.resolve(execution).catch(() => { state.sent = null; }).finally(() => {
+      state.running = false;
+      const latest = state.latest; state.latest = null;
+      if (latest && !overlay.isDestroyed()) runScript(overlay, latest);
+    });
+  }
 
   function renderCursor(display, overlay) {
     if (!cursorPosition || cursorDisplayId !== display.id || suspended || overlay.isDestroyed() || overlay.webContents.isLoading()) return;
     const localX = cursorPosition.x - display.bounds.x;
     const localY = cursorPosition.y - display.bounds.y;
-    overlay.webContents.executeJavaScript(`window.metisCursor?.(${localX},${localY},true)`).catch(() => {});
+    runScript(overlay, `window.metisCursor?.(${localX},${localY},true)`);
   }
 
   function createWindow(display) {
@@ -54,7 +73,9 @@ function createComputerUseOverlay({ BrowserWindow, screen, globalShortcut, onCan
       webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false },
     });
     overlay.setAlwaysOnTop(true, "screen-saver");
-    overlay.setIgnoreMouseEvents(true, { forward: true });
+    // The overlay is passive. Forwarding installs a native mouse path through
+    // Electron, which can stall the system pointer whenever its main loop is busy.
+    overlay.setIgnoreMouseEvents(true);
     overlay.setContentProtection(hideFromCapture);
     overlay.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(OVERLAY_HTML)}`);
     overlay.webContents.on("did-finish-load", () => {
@@ -63,7 +84,7 @@ function createComputerUseOverlay({ BrowserWindow, screen, globalShortcut, onCan
         renderCursor(display, overlay);
       }
     });
-    overlay.on("closed", () => windows.delete(display.id));
+    overlay.on("closed", () => { if (windows.get(display.id) === overlay) windows.delete(display.id); });
     return overlay;
   }
 
@@ -102,7 +123,7 @@ function createComputerUseOverlay({ BrowserWindow, screen, globalShortcut, onCan
     const nextId = display?.id ?? null;
     if (cursorDisplayId !== null && cursorDisplayId !== nextId) {
       const previous = windows.get(cursorDisplayId);
-      if (previous && !previous.isDestroyed()) previous.webContents.executeJavaScript("window.metisCursor?.(0,0,false)").catch(() => {});
+      if (previous && !previous.isDestroyed()) runScript(previous, "window.metisCursor?.(0,0,false)");
     }
     cursorDisplayId = nextId;
     if (!display || suspended) return;
@@ -116,7 +137,7 @@ function createComputerUseOverlay({ BrowserWindow, screen, globalShortcut, onCan
     cursorHideTimer = setTimeout(() => {
       if (cursorDisplayId !== null) {
         const overlay = windows.get(cursorDisplayId);
-        if (overlay && !overlay.isDestroyed()) overlay.webContents.executeJavaScript("window.metisCursor?.(0,0,false)").catch(() => {});
+        if (overlay && !overlay.isDestroyed()) runScript(overlay, "window.metisCursor?.(0,0,false)");
       }
       cursorDisplayId = null;
       cursorPosition = null;
@@ -131,8 +152,9 @@ function createComputerUseOverlay({ BrowserWindow, screen, globalShortcut, onCan
     if (escapeRegistered) globalShortcut.unregister("Escape");
     escapeRegistered = false;
     for (const overlay of windows.values()) {
-      if (!overlay.isDestroyed()) overlay.hide();
+      if (!overlay.isDestroyed()) overlay.destroy();
     }
+    windows.clear();
   }
 
   function touch() {

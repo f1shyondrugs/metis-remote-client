@@ -25,12 +25,13 @@ function fixture(hideFromCapture = true) {
       windows.push(this);
     }
     setAlwaysOnTop(value, level) { this.level = value && level; }
-    setIgnoreMouseEvents(value) { this.ignoreMouse = value; }
+    setIgnoreMouseEvents(value, options) { this.ignoreMouse = value; this.mouseOptions = options; }
     setContentProtection(value) { this.protected = value; }
     loadURL(url) { this.url = url; }
     setBounds(bounds) { this.bounds = bounds; }
     showInactive() { this.visible = true; }
     hide() { this.visible = false; }
+    destroy() { this.visible = false; this.destroyed = true; }
     isDestroyed() { return this.destroyed; }
     on() {}
   }
@@ -53,6 +54,7 @@ test("computer-use overlay covers every display and stays out of captures", () =
     assert.equal(item.visible, true);
     assert.equal(item.protected, true);
     assert.equal(item.ignoreMouse, true);
+    assert.notEqual(item.mouseOptions?.forward, true, "Passive overlays must not forward native mouse events through Electron");
     assert.equal(item.level, "screen-saver");
     const html = decodeURIComponent(item.url);
     assert.match(html, /Metis is using your computer/);
@@ -107,4 +109,28 @@ test("stream visibility switches live and applies to new monitors without ending
     assert.equal(typeof getEscape(), "function");
     assert.throws(() => overlay.setHideFromCapture("false"), /boolean/);
   } finally { overlay.hide(); }
+});
+
+test("slow overlay renderers retain only the newest cursor update", async () => {
+  const { overlay, windows } = fixture();
+  try {
+    overlay.touch();
+    const calls=[]; let finish;
+    windows[1].webContents.executeJavaScript=script=>{calls.push(script);return new Promise(resolve=>{finish=resolve})};
+    overlay.updateCursor(100,100);
+    for(let i=0;i<10000;i++)overlay.updateCursor(100+i%100,100);
+    assert.equal(calls.length,1);
+    finish(); for(let i=0;i<8;i++)await Promise.resolve();
+    assert.equal(calls.length,2);
+    assert.match(calls[1],/199,100,true/);
+  } finally {overlay.hide()}
+});
+test("ending control releases every overlay renderer and the next action recreates only current displays",()=>{
+  const {overlay,windows}=fixture();
+  overlay.touch();overlay.hide();
+  assert.ok(windows.every(w=>w.destroyed&&!w.visible));
+  overlay.touch();
+  assert.equal(windows.length,4);
+  assert.ok(windows.slice(2).every(w=>!w.destroyed&&w.visible));
+  overlay.hide();
 });
