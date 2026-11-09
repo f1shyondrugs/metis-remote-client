@@ -1,18 +1,18 @@
 const byId = (id) => document.getElementById(id);
-const state = { paired: false, clientId: "", connection: "offline", client: null, audit: [], selectedLog: "", loaded: false, fetching: false };
+const state = { paired: false, clientId: "", connection: "offline", client: null, audit: [], selectedLog: "", page: 1, view: "activity", loaded: false, fetching: false };
 
 function formatDate(value) {
   if (!value) return "Never";
   const time = new Date(value);
-  return Number.isNaN(time.getTime()) ? "Unknown" : time.toLocaleString();
+  return Number.isNaN(time.getTime()) ? "Unknown" : time.toLocaleString("en");
 }
 
 function formatShortDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Unknown";
   return date.toDateString() === new Date().toDateString()
-    ? date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-    : date.toLocaleDateString();
+    ? date.toLocaleTimeString("en", { hour: "2-digit", minute: "2-digit" })
+    : date.toLocaleDateString("en");
 }
 
 function node(tag, className, value) {
@@ -22,19 +22,43 @@ function node(tag, className, value) {
   return element;
 }
 
+function renderView() {
+  const settings = state.view === "settings";
+  byId("pair-view").hidden = state.paired || settings;
+  byId("hub-view").hidden = !state.paired || settings;
+  byId("settings-view").hidden = !settings;
+  byId("paired-settings").hidden = !state.paired;
+  if (settings) byId("open-settings").setAttribute("aria-current", "page");
+  else byId("open-settings").removeAttribute("aria-current");
+}
+function navigate(view) {
+  state.view = view;
+  renderView();
+  window.scrollTo(0, 0);
+  byId(view === "settings" ? "settings-title" : state.paired ? "device-name" : "server").focus({ preventScroll: true });
+  if (view === "activity") void refresh();
+}
+function changeCommandPage(delta) {
+  state.page += delta;
+  state.selectedLog = "";
+  renderCommands();
+}
+
 function setConnection(data) {
+  const previousClientId = state.clientId;
   Object.assign(state, data);
+  if (previousClientId !== state.clientId || !state.paired) {
+    state.audit = []; state.loaded = false; state.page = 1; state.selectedLog = "";
+  }
   if (data.appearance) window.MetisAppearance.apply(document.documentElement, data.appearance);
-  byId("pair-view").hidden = state.paired;
-  byId("hub-view").hidden = !state.paired;
+  renderView();
   byId("open-server").hidden = !state.paired;
   byId("connection-label").textContent = state.connection.charAt(0).toUpperCase() + state.connection.slice(1);
   byId("connection-dot").className = `status-dot ${state.connection}`;
-  byId("device-status").textContent = state.connection.charAt(0).toUpperCase() + state.connection.slice(1);
-  byId("device-status").className = `device-state ${state.connection}`;
   byId("update-label").textContent = data.update || "";
   if (typeof data.hideOverlayFromCapture === "boolean") renderCaptureSetting(data.hideOverlayFromCapture);
   if (data.cancelShortcut) renderCancelShortcut(data.cancelShortcut);
+  renderDesktopPermission(state);
   if (data.error && state.paired) showHubError(data.error);
   if (data.error && !state.paired) {
     byId("pair-error").textContent = data.error;
@@ -121,38 +145,58 @@ function showHubError(message) {
   element.hidden = !message;
 }
 
-function filteredAudit() {
-  const search = byId("search").value.trim().toLowerCase();
+function commandStatus(status) {
+  if (status === "error") return "Failed";
+  if (status === "unknown") return "Unclear";
+  return status ? status.charAt(0).toUpperCase() + status.slice(1) : "Unknown";
+}
+
+function commandPage() {
+  const search = byId("search").value;
   const status = byId("status-filter").value;
-  return state.audit.filter((entry) => {
-    if (entry.clientId !== state.clientId) return false;
-    if (status !== "all" && entry.status !== status) return false;
-    return !search || `${entry.action} ${entry.requestData?.command || ""}`.toLowerCase().includes(search);
-  });
+  return window.MetisCommandHistory.page(state.audit, { clientId: state.clientId, search, status, page: state.page });
 }
 
 function renderCommands() {
   const list = byId("commands-list");
+  const focusedId = list.contains(document.activeElement) ? document.activeElement.dataset.commandId : null;
   list.replaceChildren();
-  byId("commands-loading").hidden = true;
-  const items = filteredAudit();
-  if (!items.length) {
+  byId("commands-loading").hidden = state.loaded;
+  const pagination = byId("commands-pagination");
+  if (!state.loaded) { pagination.hidden = true; renderCommandDetail(null); return; }
+  const page = commandPage();
+  state.page = page.page;
+  pagination.hidden = page.pageCount <= 1;
+  byId("commands-previous").disabled = page.page <= 1;
+  byId("commands-next").disabled = page.page >= page.pageCount;
+  const range = `${page.from}–${page.to} of ${page.total}`;
+  const label = `Page ${page.page} of ${page.pageCount}`;
+  if (byId("commands-range").textContent !== range) byId("commands-range").textContent = range;
+  if (byId("commands-page").textContent !== label) byId("commands-page").textContent = label;
+  const selected = page.items.find(entry => entry.id === state.selectedLog);
+  if (!selected) state.selectedLog = "";
+  renderCommandDetail(selected);
+  if (!page.items.length) {
     list.append(node("p", "empty", state.audit.length ? "No commands match these filters." : "No commands have run on this device yet."));
     byId("command-detail").hidden = true;
     return;
   }
-  for (const entry of items) {
+  let restoreFocus;
+  for (const entry of page.items) {
     const row = node("button", `command-row ${state.selectedLog === entry.id ? "selected" : ""}`);
     row.type = "button";
+    row.dataset.commandId = entry.id;
+    if (entry.id === focusedId) restoreFocus = row;
     const name = entry.requestData?.command || entry.action;
     row.append(
       node("span", "when", formatShortDate(entry.createdAt)),
       node("span", "command-name", name),
-      node("span", `badge ${entry.status}`, entry.status === "unknown" ? "Unclear" : entry.status),
+      node("span", `badge ${entry.status}`, commandStatus(entry.status)),
     );
     row.addEventListener("click", () => selectLog(entry.id));
     list.append(row);
   }
+  restoreFocus?.focus({ preventScroll: true });
 }
 
 function detailField(parent, title, value) {
@@ -163,7 +207,9 @@ function detailField(parent, title, value) {
 function selectLog(id) {
   state.selectedLog = id;
   renderCommands();
-  const entry = state.audit.find((item) => item.id === id);
+}
+
+function renderCommandDetail(entry) {
   const detail = byId("command-detail");
   detail.replaceChildren();
   if (!entry) {
@@ -182,7 +228,7 @@ function selectLog(id) {
   });
   heading.append(close);
   detail.append(heading);
-  detail.append(node("p", "detail-meta", `${entry.status} · ${formatDate(entry.createdAt)}${entry.durationMs != null ? " · " + entry.durationMs + " ms" : ""} · ${entry.source}`));
+  detail.append(node("p", "detail-meta", `${commandStatus(entry.status)} · ${formatDate(entry.createdAt)}${entry.durationMs != null ? " · " + entry.durationMs + " ms" : ""} · ${entry.source}`));
   if (entry.error) detailField(detail, "Error", entry.error);
   if (entry.requestData && Object.keys(entry.requestData).length) detailField(detail, "Request", entry.requestData);
   if (entry.resultData && Object.keys(entry.resultData).length) detailField(detail, "Result", entry.resultData);
@@ -250,7 +296,7 @@ async function refreshDesktopPermissions(prompt = false) {
 }
 
 async function refresh() {
-  if (!state.paired || state.fetching || document.hidden) return;
+  if (!state.paired || state.fetching || document.hidden || state.view === "settings") return;
   state.fetching = true;
   try {
     const data = await window.metis.snapshot();
@@ -262,10 +308,9 @@ async function refresh() {
     const access = state.client?.permissionMode === "admin" ? "Administrator access" : state.client?.permissionMode === "user" ? "User access" : "Access mode unavailable";
     byId("device-meta").textContent = [state.client?.os || "", state.client?.version ? `v${state.client.version}` : null, access].filter(Boolean).join(" · ");
     byId("device-seen").textContent = state.client?.lastSeenAt ? `Last seen ${formatDate(state.client.lastSeenAt)}` : "";
-    byId("sync-label").textContent = `Updated ${new Date().toLocaleTimeString()}`;
+    byId("sync-label").textContent = `Updated ${new Date().toLocaleTimeString("en")}`;
     void refreshDesktopPermissions();
     renderCommands();
-    if (state.selectedLog) selectLog(state.selectedLog);
   } catch (error) {
     showHubError(error.message || "Could not load this device's activity");
     byId("sync-label").textContent = "Could not sync this device";
@@ -294,8 +339,8 @@ async function initialize() {
     .finally(() => { loginInput.disabled = false; });
   try {
     setConnection(await window.metis.state());
-    void refreshDesktopPermissions();
     if (state.paired) void refresh();
+    else void refreshDesktopPermissions();
   } catch (error) {
     byId("pair-error").textContent = error.message || "Could not initialize the app";
     byId("pair-error").hidden = false;
@@ -327,8 +372,14 @@ byId("export").addEventListener("click", async () => {
   try { await window.metis.exportAudit(); }
   catch (error) { showHubError(error.message || "Could not export logs"); }
 });
-byId("search").addEventListener("input", renderCommands);
-byId("status-filter").addEventListener("change", renderCommands);
+function resetCommandFilters() { state.page = 1; state.selectedLog = ""; renderCommands(); }
+byId("search").addEventListener("input", resetCommandFilters);
+byId("status-filter").addEventListener("change", resetCommandFilters);
+byId("commands-previous").addEventListener("click", () => changeCommandPage(-1));
+byId("commands-next").addEventListener("click", () => changeCommandPage(1));
+byId("open-settings").addEventListener("click", () => navigate("settings"));
+byId("close-settings").addEventListener("click", () => navigate("activity"));
+byId("open-activity").addEventListener("click", () => navigate("activity"));
 byId("open-server").addEventListener("click", () => void window.metis.openServer());
 byId("autostart").addEventListener("change", async (event) => {
   event.target.disabled = true;
@@ -337,16 +388,21 @@ byId("autostart").addEventListener("change", async (event) => {
   finally { event.target.disabled = false; }
 });
 byId("check-updates").addEventListener("click", async () => {
-  byId("more-menu").open = false;
-  byId("update-label").textContent = await window.metis.checkUpdates();
+  const button = byId("check-updates");
+  button.disabled = true;
+  byId("update-label").textContent = "Checking for updates…";
+  try { byId("update-label").textContent = await window.metis.checkUpdates(); }
+  catch (error) { byId("update-label").textContent = ""; showHubError(error.message || "Could not check for updates."); }
+  finally { button.disabled = false; }
 });
 byId("unpair").addEventListener("click", async () => {
-  byId("more-menu").open = false;
   if (!window.confirm("Disconnect this device from Metis AI? You can pair it again from Settings → Devices.")) return;
-  setConnection(await window.metis.unpair());
-  state.client = null;
-  state.audit = [];
-  state.loaded = false;
+  try {
+    const data = await window.metis.unpair();
+    state.client = null; state.audit = []; state.loaded = false; state.page = 1; state.selectedLog = ""; state.view = "activity";
+    setConnection(data);
+    byId("server").focus();
+  } catch (error) { showHubError(error.message || "Could not disconnect this device."); }
 });
 setInterval(() => void refresh(), 5_000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) void refresh(); });
@@ -361,8 +417,4 @@ function renderDesktopPermission(next) {
   byId("desktop-permission-reason").textContent = next.desktopReason || "Desktop control is unavailable. File and command access remain available.";
   byId("desktop-access-permissions").hidden = next.platform !== "darwin";
   byId("pair-note").textContent = next.platform === "win32" ? "The code expires after 15 minutes. For admin access, start this app as administrator and confirm UAC." : "The code expires after 15 minutes. System actions require the permissions of your signed-in account.";
-}
-if (window.metis) {
-  window.metis.state().then(renderDesktopPermission).catch(() => {});
-  window.metis.onStatus(renderDesktopPermission);
 }

@@ -1,6 +1,6 @@
 {
   "name": "metis-ai-remote-client",
-  "version": "1.4.15",
+  "version": "1.4.16",
   "private": true,
   "description": "Metis AI Remote Client Hub",
   "main": "main.cjs",
@@ -41,6 +41,7 @@
       "preload.cjs",
       "index.html",
       "renderer.js",
+      "command-history.cjs",
       "styles.css",
       "client.mjs",
       "computer-use.mjs",
