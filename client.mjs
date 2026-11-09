@@ -267,14 +267,15 @@ export function startRemoteClient({ config: suppliedConfig, configPath, onEvent 
         retryMs = 1_000;
         log("authenticated", message.clientId || "");
         emit({ type: "connection", status: "online", at: new Date().toISOString() });
-        send({ type: "heartbeat", desktopGui: Boolean(desktopGuiAvailable()), nativeNotifications: typeof showNotification === "function" && nativeNotificationsAvailable() === true });
+        send({ type: "heartbeat", appearance: true, desktopGui: Boolean(desktopGuiAvailable()), nativeNotifications: typeof showNotification === "function" && nativeNotificationsAvailable() === true });
         clearInterval(heartbeatTimer);
-        heartbeatTimer = setInterval(() => send({ type: "heartbeat", desktopGui: Boolean(desktopGuiAvailable()), nativeNotifications: typeof showNotification === "function" && nativeNotificationsAvailable() === true }), 20_000);
+        heartbeatTimer = setInterval(() => send({ type: "heartbeat", appearance: true, desktopGui: Boolean(desktopGuiAvailable()), nativeNotifications: typeof showNotification === "function" && nativeNotificationsAvailable() === true }), 20_000);
         clearTimeout(heartbeatTimeout);
         heartbeatTimeout = setTimeout(() => current.terminate(), 75_000);
         return;
       }
-      if (message.type === "heartbeat_ack") {
+      if (message.type === "heartbeat_ack" && authenticated) {
+        if (message.appearance) emit({ type: "appearance", appearance: message.appearance });
         clearTimeout(heartbeatTimeout);
         heartbeatTimeout = setTimeout(() => current.terminate(), 75_000);
         return;

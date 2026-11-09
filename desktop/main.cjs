@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { app, BrowserWindow, Menu, Tray, nativeImage, ipcMain, shell, safeStorage, Notification, dialog, screen, globalShortcut, systemPreferences, desktopCapturer } = require("electron");
 const { createComputerUseOverlay } = require("./computer-use-overlay.cjs");
+const appearance = require("./appearance.cjs");
+let currentAppearance = appearance.fallback;
 const { getDesktopAutostart, setDesktopAutostart } = require("./platform.cjs");
 const { autoUpdater } = require("electron-updater");
 const { createCredentialStore } = require("./credential-store.cjs");
@@ -150,6 +152,7 @@ function publicState() {
     permissionMode: config?.permissionMode || null,
     platform: process.platform,
     hideOverlayFromCapture: overlayPreferences?.get() ?? true,
+    appearance: currentAppearance,
     ...status,
   };
 }
@@ -305,6 +308,9 @@ async function startRuntime() {
   computerUseOverlay?.hide();
   runtime?.stop();
   runtime = null;
+  currentAppearance = appearance.fallback;
+  computerUseOverlay?.setAppearance(currentAppearance);
+  broadcast();
   if (!config) return;
   const clientModule = await import(pathToFileURL(path.join(__dirname, "client.mjs")).href);
   const { showNativeNotification } = require("./notification-native.cjs");
@@ -315,6 +321,15 @@ async function startRuntime() {
     nativeNotificationsAvailable: () => screen.getAllDisplays().length > 0 && Notification.isSupported(),
     showNotification: notification => showNativeNotification({ Notification, openExternal: url => shell.openExternal(url), server: config.server, notification }),
     onEvent(event) {
+      if (event.type === "appearance") {
+        const next = appearance.normalize(event.appearance);
+        if (next && JSON.stringify(next) !== JSON.stringify(currentAppearance)) {
+          currentAppearance = next;
+          computerUseOverlay?.setAppearance(next);
+          broadcast();
+        }
+        return;
+      }
       if (event.type === "computer_use") {
         if (event.phase === "start") {
           computerUseOverlay?.touch();
@@ -413,6 +428,8 @@ function registerIpc() {
     runtime?.stop();
     runtime = null;
     config = null;
+    currentAppearance = appearance.fallback;
+    computerUseOverlay?.setAppearance(currentAppearance);
     fs.rmSync(configPath(), { force: true });
     status.connection = "offline";
     status.error = "";

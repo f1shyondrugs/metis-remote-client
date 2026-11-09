@@ -24,6 +24,7 @@ function node(tag, className, value) {
 
 function setConnection(data) {
   Object.assign(state, data);
+  if (data.appearance) window.MetisAppearance.apply(document.documentElement, data.appearance);
   byId("pair-view").hidden = state.paired;
   byId("hub-view").hidden = !state.paired;
   byId("open-server").hidden = !state.paired;

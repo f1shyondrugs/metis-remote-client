@@ -57,10 +57,10 @@ test("computer-use overlay covers every display and stays out of captures", () =
     assert.notEqual(item.mouseOptions?.forward, true, "Passive overlays must not forward native mouse events through Electron");
     assert.equal(item.level, "screen-saver");
     const html = decodeURIComponent(item.url);
-    assert.match(html, /Metis is using your computer/);
+    assert.match(html, /Metis is controlling your computer/);
     assert.match(html, /Press Escape to cancel/);
-    assert.match(html, /body::before/);
-    assert.match(html, /border: 2px solid rgba\(255,255,255,.96\)/);
+    assert.match(html, /class="edge edge-top"/);
+    assert.match(html, /prefers-reduced-motion/);
     assert.match(html, /M7\.1 4\.15C4\.05 3\.4 1\.72 6\.15/);
   }
   assert.deepEqual(windows.map((item) => item.options.x), [-1920, 0]);
@@ -108,6 +108,27 @@ test("stream visibility switches live and applies to new monitors without ending
     assert.equal(getCancelled(), 0);
     assert.equal(typeof getEscape(), "function");
     assert.throws(() => overlay.setHideFromCapture("false"), /boolean/);
+  } finally { overlay.hide(); }
+});
+
+test("account theme reaches existing, loading and newly attached displays without ending control", () => {
+  const { overlay, windows, screen, displays, getEscape, getCancelled } = fixture();
+  try {
+    overlay.touch();
+    const theme = {version:1, mode:"light", variables:{"--primary":"#685139"}};
+    windows[0].webContents.isLoading = () => true;
+    assert.equal(overlay.setAppearance(theme), true);
+    assert.match(windows[1].scripts.at(-1), /#685139/);
+    windows[0].webContents.isLoading = () => false;
+    windows[0].webContents.emit("did-finish-load");
+    assert.match(windows[0].scripts.at(-1), /#685139/);
+    displays.push({id:3, bounds:{x:2560,y:0,width:1920,height:1080}});
+    screen.emit("display-added");
+    assert.match(decodeURIComponent(windows[2].url), /#685139/);
+    assert.equal(overlay.setAppearance({version:2}),false);
+    assert.ok(windows.every(w => w.visible && w.protected && w.ignoreMouse));
+    assert.equal(typeof getEscape(), "function");
+    assert.equal(getCancelled(),0);
   } finally { overlay.hide(); }
 });
 
