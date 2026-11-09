@@ -34,6 +34,7 @@ function setConnection(data) {
   byId("device-status").className = `device-state ${state.connection}`;
   byId("update-label").textContent = data.update || "";
   if (typeof data.hideOverlayFromCapture === "boolean") renderCaptureSetting(data.hideOverlayFromCapture);
+  if (data.cancelShortcut) renderCancelShortcut(data.cancelShortcut);
   if (data.error && state.paired) showHubError(data.error);
   if (data.error && !state.paired) {
     byId("pair-error").textContent = data.error;
@@ -62,6 +63,57 @@ byId("hide-overlay-from-capture").addEventListener("change", async (event) => {
     input.disabled = false;
   }
 });
+
+function renderCancelShortcut(value = "Escape") {
+  state.cancelShortcut = value;
+  if (!state.recordingShortcut) byId("cancel-shortcut").value = window.MetisCancelShortcut.label(value, state.platform);
+}
+
+async function saveCancelShortcut(value) {
+  const input = byId("cancel-shortcut");
+  state.recordingShortcut = false;
+  input.disabled = true;
+  byId("reset-cancel-shortcut").disabled = true;
+  byId("shortcut-error").hidden = true;
+  byId("shortcut-status").textContent = "Saving shortcut…";
+  try {
+    renderCancelShortcut(await window.metis.setCancelShortcut(value));
+    byId("shortcut-status").textContent = "Shortcut saved.";
+  } catch (error) {
+    renderCancelShortcut(state.cancelShortcut);
+    byId("shortcut-error").textContent = error.message || "Could not save cancellation shortcut.";
+    byId("shortcut-error").hidden = false;
+    byId("shortcut-status").textContent = "";
+  } finally {
+    input.disabled = false;
+    byId("reset-cancel-shortcut").disabled = false;
+  }
+}
+
+byId("cancel-shortcut").addEventListener("focus", () => {
+  state.recordingShortcut = true;
+  byId("cancel-shortcut").value = "Press a key…";
+  byId("shortcut-status").textContent = "Listening for a key or combination…";
+});
+byId("cancel-shortcut").addEventListener("blur", () => {
+  state.recordingShortcut = false;
+  renderCancelShortcut(state.cancelShortcut);
+  if (!byId("cancel-shortcut").disabled) byId("shortcut-status").textContent = "";
+});
+byId("cancel-shortcut").addEventListener("keydown", event => {
+  // Tab keeps ordinary keyboard navigation; Shift+Tab also leaves the recorder.
+  if (event.key === "Tab" && !event.ctrlKey && !event.altKey && !event.metaKey) return;
+  event.preventDefault();
+  event.stopPropagation();
+  try {
+    const value = window.MetisCancelShortcut.fromEvent(event);
+    if (value) void saveCancelShortcut(value);
+  } catch (error) {
+    byId("shortcut-error").textContent = error.message;
+    byId("shortcut-error").hidden = false;
+  }
+});
+byId("reset-cancel-shortcut").addEventListener("click", () => void saveCancelShortcut("Escape"));
 
 function showHubError(message) {
   const element = byId("hub-error");

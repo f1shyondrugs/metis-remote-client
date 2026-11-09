@@ -65,7 +65,14 @@ test("real main IPC validates, broadcasts a successful toggle, and rolls back fa
       '\nmodule.exports = { registerIpc, publicState, configure(p, o, w) { overlayPreferences=p; computerUseOverlay=o; window=w; } };', context);
     const main = context.module.exports;
     const store = createOverlayPreferences(path.join(dir, "preferences.json"));
-    const overlay = { setHideFromCapture: value => { applied = value; } };
+    const overlay = {
+      setHideFromCapture: value => { applied = value; },
+      setCancelShortcut: (value,persist) => {
+        const key=require("../desktop/cancel-shortcut.cjs").normalize(value);
+        persist(key);
+        return key;
+      },
+    };
     const window = { webContents: { send: (channel, value) => sent.push({channel,value}) } };
     main.configure(store, overlay, window);
     main.registerIpc();
@@ -77,6 +84,11 @@ test("real main IPC validates, broadcasts a successful toggle, and rolls back fa
     assert.equal(createOverlayPreferences(path.join(dir, "preferences.json")).get(), false);
     assert.throws(() => toggle({}, "false"), /boolean/);
     assert.equal(applied, false);
+    const shortcutHandler=handlers.get("hub:set-cancel-shortcut");
+    assert.equal(shortcutHandler({},"Ctrl+Shift+X"),"Control+Shift+X");
+    assert.equal(main.publicState().cancelShortcut,"Control+Shift+X");
+    assert.equal(sent.at(-1).value.cancelShortcut,"Control+Shift+X");
+    assert.equal(createOverlayPreferences(path.join(dir,"preferences.json")).getCancelShortcut(),"Control+Shift+X");
     main.configure({get: () => false, set: () => {throw Error("Disk full");}}, overlay, window);
     const broadcasts = sent.length;
     assert.throws(() => toggle({}, true), /Disk full/);

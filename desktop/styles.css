@@ -82,6 +82,15 @@ h1 { font-size: clamp(25px, 3vw, 31px); line-height: 1.15; letter-spacing: -.045
 .capture-setting .menu-item.check input { margin-top: 2px; }
 .capture-setting .subtle { margin: 4px 0 0 24px; max-width: 72ch; }
 .capture-setting .error-text { margin: 8px 0 0 24px; }
+.shortcut-setting { padding-top: 20px; align-items: center; }
+.shortcut-copy { flex: 1; min-width: 160px; }
+.shortcut-copy label { display: block; margin-bottom: 5px; font-size: 13px; font-weight: 600; color: var(--text); }
+.shortcut-controls { display: flex; gap: 8px; align-items: center; max-width: 100%; }
+#cancel-shortcut { width: 190px; max-width: calc(100vw - 122px); min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--text); cursor: pointer; }
+#cancel-shortcut:focus { border-color: var(--focus); }
+#reset-cancel-shortcut { min-height: 44px; }
+#shortcut-status, #shortcut-error { width: 100%; margin: 0; }
+#shortcut-status:empty { display: none; }
 .activity-pane { min-width: 0; }
 .section-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; padding: 26px 0 18px; }
 .section-heading h2 { font-size: 16px; font-weight: 600; margin: 0 0 4px; letter-spacing: -.02em; }

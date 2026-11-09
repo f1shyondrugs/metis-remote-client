@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld("metis", {
   openServer: () => ipcRenderer.invoke("hub:open-server"),
   exportAudit: () => ipcRenderer.invoke("hub:export"),
   setOverlayCaptureHidden: (value) => ipcRenderer.invoke("hub:set-overlay-capture-hidden", value),
+  setCancelShortcut: (value) => ipcRenderer.invoke("hub:set-cancel-shortcut", value),
   getAutostart: () => ipcRenderer.invoke("hub:get-autostart"),
   setAutostart: (value) => ipcRenderer.invoke("hub:set-autostart", value),
   desktopAccess: () => ipcRenderer.invoke("hub:desktop-access"),

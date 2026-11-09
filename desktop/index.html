@@ -7,6 +7,7 @@
   <title>Metis AI Remote Client</title>
   <link rel="stylesheet" href="./styles.css">
   <script src="./appearance.cjs"></script>
+  <script src="./cancel-shortcut.cjs"></script>
 </head>
 <body>
   <header class="topbar">
@@ -63,6 +64,15 @@
           <p id="capture-status" class="subtle" role="status">Hidden from screen captures</p>
           <p id="capture-error" class="error-text" role="alert" hidden></p>
         </div>
+      </div>
+      <div class="device-summary shortcut-setting">
+        <div class="shortcut-copy"><label for="cancel-shortcut">Cancel Computer Use</label><p id="shortcut-help" class="subtle">Choose the key or combination that stops desktop control.</p></div>
+        <div class="shortcut-controls">
+          <input id="cancel-shortcut" type="text" value="Esc" readonly aria-describedby="shortcut-help shortcut-error" aria-label="Cancellation shortcut. Click and press a key or combination.">
+          <button id="reset-cancel-shortcut" class="text-button" type="button">Reset</button>
+        </div>
+        <p id="shortcut-status" class="subtle" role="status" aria-live="polite"></p>
+        <p id="shortcut-error" class="error-text" role="alert" hidden></p>
       </div>
       <div id="desktop-permissions" class="device-summary permissions-card" hidden>
         <div>

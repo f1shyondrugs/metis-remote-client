@@ -153,6 +153,7 @@ function publicState() {
     platform: process.platform,
     hideOverlayFromCapture: overlayPreferences?.get() ?? true,
     appearance: currentAppearance,
+    cancelShortcut: overlayPreferences?.getCancelShortcut?.() ?? "Escape",
     ...status,
   };
 }
@@ -333,7 +334,7 @@ async function startRuntime() {
       if (event.type === "computer_use") {
         if (event.phase === "start") {
           computerUseOverlay?.touch();
-          if (event.operation === "key" && /^(esc|escape)$/i.test(String(event.key || "").trim())) computerUseOverlay?.suppressInjectedEscape();
+          if (event.operation === "key") computerUseOverlay?.suppressInjectedShortcut(event.key);
           startComputerUseCursor();
         } else if (event.phase === "end") stopComputerUseCursor();
         else if (event.phase === "capture-start") computerUseOverlay?.suspendCapture();
@@ -449,6 +450,11 @@ function registerIpc() {
     return true;
   });
   ipcMain.handle("hub:set-overlay-capture-hidden", (_event, value) => setOverlayCaptureHidden(value));
+  ipcMain.handle("hub:set-cancel-shortcut", (_event, value) => {
+    const next = computerUseOverlay.setCancelShortcut(value, key => overlayPreferences.setCancelShortcut(key));
+    broadcast();
+    return next;
+  });
   ipcMain.handle("hub:get-autostart", () => getAutostart());
   ipcMain.handle("hub:set-autostart", async (_event, value) => {
     const enabled = await setAutostart(Boolean(value));
@@ -546,13 +552,19 @@ if (!app.requestSingleInstanceLock()) {
     } catch (error) {
       status.error = "Could not load capture visibility: " + error.message;
       // Keep the previous hidden default, while allowing a later save to recover.
-      overlayPreferences = { get: () => true, set(value) {
+      const recover = (method, value) => {
         const recovered = createOverlayPreferences(path.join(app.getPath("userData"), "preferences.json"));
-        recovered.set(value);
+        const result = recovered[method](value);
         overlayPreferences = recovered;
-      } };
+        return result;
+      };
+      overlayPreferences = {
+        get: () => true, getCancelShortcut: () => "Escape",
+        set: value => recover("set", value),
+        setCancelShortcut: value => recover("setCancelShortcut", value),
+      };
     }
-    computerUseOverlay = createComputerUseOverlay({ BrowserWindow, screen, globalShortcut, onCancel: cancelComputerUse, hideFromCapture: overlayPreferences.get() });
+    computerUseOverlay = createComputerUseOverlay({ BrowserWindow, screen, globalShortcut, onCancel: cancelComputerUse, hideFromCapture: overlayPreferences.get(), cancelShortcut: overlayPreferences.getCancelShortcut() });
     await probeDesktop();
     desktopProbeTimer = setInterval(() => { probeDesktop().catch(() => {}); }, 20_000);
     desktopProbeTimer.unref?.();
