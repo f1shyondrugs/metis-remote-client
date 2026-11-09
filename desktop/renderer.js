@@ -232,7 +232,7 @@ function renderCommandDetail(entry) {
   if (entry.error) detailField(detail, "Error", entry.error);
   if (entry.requestData && Object.keys(entry.requestData).length) detailField(detail, "Request", entry.requestData);
   if (entry.resultData && Object.keys(entry.resultData).length) detailField(detail, "Result", entry.resultData);
-  if (entry.status === "unknown") detailField(detail, "Outcome", "The connection ended before Metis AI received a result. The command may have run. Check this device before retrying.");
+  if (entry.status === "unknown") detailField(detail, "Outcome", "The connection ended before Metis received a result. The command may have run. Check this device before retrying.");
 }
 
 function desktopPermissionCopy(status) {
@@ -396,7 +396,7 @@ byId("check-updates").addEventListener("click", async () => {
   finally { button.disabled = false; }
 });
 byId("unpair").addEventListener("click", async () => {
-  if (!window.confirm("Disconnect this device from Metis AI? You can pair it again from Settings → Devices.")) return;
+  if (!window.confirm("Disconnect this device from Metis? You can pair it again from Settings → Devices.")) return;
   try {
     const data = await window.metis.unpair();
     state.client = null; state.audit = []; state.loaded = false; state.page = 1; state.selectedLog = ""; state.view = "activity";

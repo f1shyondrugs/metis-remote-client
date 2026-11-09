@@ -14,7 +14,7 @@ const { execFile } = require("node:child_process");
 const { Worker } = require("node:worker_threads");
 const { pathToFileURL } = require("node:url");
 
-const APP_NAME = "Metis AI Remote Client";
+const APP_NAME = "Metis Remote Client";
 const AUTOSTART_TASK = "Metis AI Remote Client";
 let autostartEnabled = false;
 let autostartLookup;
@@ -246,7 +246,7 @@ function updateTray() {
     { type: "separator" },
     { label: "Start at login", type: "checkbox", checked: autostartEnabled,
       click: async (item) => { try { await setAutostart(item.checked); } catch (error) { lastTrayKey = ""; status.error = error.message; broadcast(); } } },
-    { label: "Open Metis AI", enabled: Boolean(config), click: () => config && shell.openExternal(config.server) },
+    { label: "Open Metis", enabled: Boolean(config), click: () => config && shell.openExternal(config.server) },
     { type: "separator" },
     { label: "Quit", click: () => { quitting = true; app.quit(); } },
   ]));
@@ -383,12 +383,12 @@ function registerIpc() {
     if (!["https:", "http:"].includes(parsed.protocol) || parsed.username || parsed.password) {
       throw new Error("Enter a valid HTTP or HTTPS server URL");
     }
-    if (!token) throw new Error("Enter the pairing code from Metis AI");
+    if (!token) throw new Error("Enter the pairing code from Metis");
     const permissionMode = token.startsWith("a_") ? "admin" : "user";
     if (process.platform === "win32") {
       const elevated = isElevated();
-      if (permissionMode === "admin" && !elevated) throw new Error("Admin access was selected in Metis AI. Start this app as administrator and confirm UAC, then enter the same code.");
-      if (permissionMode === "user" && elevated) throw new Error("User access was selected in Metis AI. Start this app normally, without administrator rights, then enter the same code.");
+      if (permissionMode === "admin" && !elevated) throw new Error("Admin access was selected in Metis. Start this app as administrator and confirm UAC, then enter the same code.");
+      if (permissionMode === "user" && elevated) throw new Error("User access was selected in Metis. Start this app normally, without administrator rights, then enter the same code.");
     }
     const response = await fetch(`${parsed.origin}/api/remote-clients/enroll`, {
       method: "POST",
