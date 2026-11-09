@@ -17,7 +17,7 @@ test("only authenticated heartbeat replies update the desktop theme", () => {
     close() { this.readyState=3; }
   }
   const source = fs.readFileSync(new URL("../client.mjs",import.meta.url),"utf8")
-    .replace(/^#!.*\n/,"").replace(/^import .*;\n/gm,"")
+    .replace(/\r\n/g,"\n").replace(/^#!.*\n/,"").replace(/^import .*;\n/gm,"")
     .replace("export function startRemoteClient","function startRemoteClient")
     .split("if (process.argv[1]")[0]
     .replaceAll("import.meta.url",JSON.stringify(new URL("../client.mjs",import.meta.url).href));
