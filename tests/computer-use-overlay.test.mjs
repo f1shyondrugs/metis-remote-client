@@ -60,7 +60,7 @@ test("computer-use overlay covers every display and stays out of captures", () =
     const html = decodeURIComponent(item.url);
     assert.match(html, /Metis is using your computer/);
     assert.match(html, /Press Esc to cancel/);
-    assert.match(html, /class="edge edge-top"/);
+    assert.match(html, /class="edge"/);
     assert.match(html, /prefers-reduced-motion/);
     assert.match(html, /M7\.1 4\.15C4\.05 3\.4 1\.72 6\.15/);
   }
