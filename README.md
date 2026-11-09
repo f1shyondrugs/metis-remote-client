@@ -1,4 +1,11 @@
-# Metis AI Remote Client
+# Metis Remote Client — compatibility repository
+
+The desktop client has moved into [Metis-Apps](https://github.com/f1shyondrugs/Metis-Apps/tree/main/desktop) as the unified **Metis** app for Windows, macOS and Linux. New development and canonical releases belong there.
+
+This repository stays available for existing installations and their old update feed. A transition release may mirror the exact binaries and updater metadata from Metis-Apps. After that update, the installed app checks Metis-Apps directly. Existing pairing, permissions and preferences are preserved; no headless client or live connection is automatically removed.
+
+The sections below document the legacy client. For current builds and usage, use [the desktop documentation in Metis-Apps](https://github.com/f1shyondrugs/Metis-Apps/blob/main/desktop/README.md).
+
 
 The desktop remote client for Metis AI lives in this public repository. Download the current installer from the [latest GitHub Release](https://github.com/f1shyondrugs/metis-remote-client/releases/latest):
 
@@ -32,7 +39,7 @@ npm ci --prefix desktop
 npm run build:win --prefix desktop -- --publish never
 ```
 
-The Windows build writes `desktop/dist/Metis-AI-Remote-Client-Setup.exe` and `desktop/dist/latest.yml`. macOS writes `Metis-AI-Remote-Client-arm64.dmg`. Linux writes `Metis-AI-Remote-Client-x86_64.AppImage`. Push a tag matching `desktop/package.json`, such as `v1.4.2`, to publish release assets. Builds are currently unsigned.
+The Windows build writes `desktop/dist/Metis-AI-Remote-Client-Setup.exe` and `desktop/dist/latest.yml`. macOS writes `Metis-AI-Remote-Client-arm64.dmg`. Linux writes `Metis-AI-Remote-Client-x86_64.AppImage`. Canonical releases are now built in Metis-Apps. Tag-based publishing in this compatibility repository is disabled; transition artifacts must be copied unchanged from a successful canonical release. Builds are currently unsigned.
 
 ```bash
 npm ci --prefix desktop

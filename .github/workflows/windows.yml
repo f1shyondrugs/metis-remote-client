@@ -1,9 +1,8 @@
-name: Remote Client desktop releases
+name: Legacy client compatibility checks
 
 on:
   push:
     branches: [master]
-    tags: ["v*"]
   pull_request:
 
 permissions:
@@ -55,20 +54,3 @@ jobs:
             desktop/dist/*.blockmap
           if-no-files-found: error
           retention-days: 7
-  release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: metis-remote-client-*
-          path: release
-          merge-multiple: true
-      - name: Publish complete release after every platform succeeds
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ github.ref_name }}" release/* --title "Metis AI Remote Client ${{ github.ref_name }}" --generate-notes --verify-tag --latest
