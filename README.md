@@ -9,7 +9,9 @@ This repository stays available for existing installations and their old update 
 The sections below document the legacy client. For current builds and usage, use [the desktop documentation in Metis-Apps](https://github.com/f1shyondrugs/Metis-Apps/blob/main/desktop/README.md).
 
 
-The desktop remote client for Metis AI lives in this public repository. Download the current installer from the [latest GitHub Release](https://github.com/f1shyondrugs/metis-remote-client/releases/latest):
+## Unsupported legacy reference
+
+The standalone client below is retained only for compatibility. For current downloads, use [Metis-Apps releases](https://github.com/f1shyondrugs/Metis-Apps/releases/latest). Historical installers remain in the [legacy releases](https://github.com/f1shyondrugs/metis-remote-client/releases):
 
 - Windows: `Metis-AI-Remote-Client-Setup.exe`
 - macOS Apple Silicon: `Metis-AI-Remote-Client-arm64.dmg`
