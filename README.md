@@ -1,4 +1,6 @@
-# Metis Remote Client — compatibility repository
+# Metis Remote Client — deprecated
+
+> **This standalone client is no longer supported and does not receive new features or regular updates.** Download and develop the unified **Metis** app in [Metis-Apps](https://github.com/f1shyondrugs/Metis-Apps). Existing installations and pairing data remain valid during the transition.
 
 The desktop client has moved into [Metis-Apps](https://github.com/f1shyondrugs/Metis-Apps/tree/main/desktop) as the unified **Metis** app for Windows, macOS and Linux. New development and canonical releases belong there.
 
